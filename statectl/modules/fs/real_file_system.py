@@ -5,7 +5,7 @@ import shutil
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, override
 
 from statectl.interfaces.fs.file_entry import FileEntry
 from statectl.interfaces.fs.file_system import FileSystem
@@ -39,30 +39,38 @@ def _translate(path: Path) -> Iterator[None]:
 
 
 class RealFileSystem(FileSystem):
+    @override
     def exists(self, path: Path) -> bool:
         return path.exists()
 
+    @override
     def is_file(self, path: Path) -> bool:
         return path.is_file()
 
+    @override
     def is_dir(self, path: Path) -> bool:
         return path.is_dir()
 
+    @override
     def is_writable(self, path: Path) -> bool:
         return os.access(path, os.W_OK)
 
+    @override
     def read_text_file(self, path: Path, encoding: str = "utf-8") -> str:
         with _translate(path):
             return path.read_text(encoding=encoding)
 
+    @override
     def write_text_file(self, path: Path, text: str, encoding: str = "utf-8") -> None:
         with _translate(path):
             path.write_text(text, encoding=encoding)
 
+    @override
     def delete_file(self, path: Path) -> None:
         with _translate(path):
             path.unlink()
 
+    @override
     def list_files(self, path: Path) -> list[FileEntry]:
         with _translate(path):
             return [
@@ -70,10 +78,12 @@ class RealFileSystem(FileSystem):
                 for p in path.iterdir()
             ]
 
+    @override
     def create_folder(self, path: Path, parents: bool = False, exist_ok: bool = False) -> None:
         with _translate(path):
             path.mkdir(parents=parents, exist_ok=exist_ok)
 
+    @override
     def delete_folder(self, path: Path, recursive: bool = False) -> None:
         with _translate(path):
             if recursive:
@@ -81,6 +91,7 @@ class RealFileSystem(FileSystem):
             else:
                 path.rmdir()
 
+    @override
     def create_temp_folder(self, prefix: str | None = None) -> Path:
         with _translate(Path(tempfile.gettempdir())):
             return Path(tempfile.mkdtemp(prefix=prefix))

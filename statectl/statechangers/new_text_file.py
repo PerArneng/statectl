@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import override
 
 from statectl.interfaces.fs.file_system import FileSystem
 from statectl.interfaces.fs.error.fs_error import FsError
@@ -33,9 +34,11 @@ class NewTextFileStateChanger(RollbackableStateChanger):
         self._params = params
         self._fs: FileSystem = file_system or RealFileSystem()
 
+    @override
     def name(self) -> str:
         return f"new-text-file:{self._params.path}"
 
+    @override
     def assess_state(self) -> StateAssessment:
         path = self._params.path
         parent = path.parent
@@ -86,6 +89,7 @@ class NewTextFileStateChanger(RollbackableStateChanger):
             description=f"ready to create {path}",
         )
 
+    @override
     def transition(self) -> Result:
         try:
             self._fs.write_text_file(
@@ -95,6 +99,7 @@ class NewTextFileStateChanger(RollbackableStateChanger):
             return Result.failure("WRITE_FAILED", f"failed to write {self._params.path}: {e}")
         return Result.success(f"wrote {self._params.path}")
 
+    @override
     def rollback(self) -> StateChanger:
         return NewTextFileRollbackStateChanger(self._params, file_system=self._fs)
 
@@ -108,9 +113,11 @@ class NewTextFileRollbackStateChanger(StateChanger):
         self._params = params
         self._fs: FileSystem = file_system or RealFileSystem()
 
+    @override
     def name(self) -> str:
         return f"new-text-file-rollback:{self._params.path}"
 
+    @override
     def assess_state(self) -> StateAssessment:
         path = self._params.path
         if not self._fs.exists(path):
@@ -137,6 +144,7 @@ class NewTextFileRollbackStateChanger(StateChanger):
             description=f"ready to remove {path}",
         )
 
+    @override
     def transition(self) -> Result:
         try:
             self._fs.delete_file(self._params.path)

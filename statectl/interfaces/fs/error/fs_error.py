@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import override
 
 
 class FsError(Exception):
@@ -9,6 +10,7 @@ class FsError(Exception):
         self.message = message
         self.path = path
 
+    @override
     def __str__(self) -> str:
         if self.path is not None:
             return f"{self.message}: {self.path}"

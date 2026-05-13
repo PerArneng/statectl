@@ -5,6 +5,7 @@ from dependency_injector import containers, providers
 from statectl.interfaces.logger import Logger
 from statectl.modules.fs.real_file_system import RealFileSystem
 from statectl.modules.logger.default_logger import DefaultLogger
+from statectl.modules.process.real_process_runner import RealProcessRunner
 from statectl.state_changer import ExistingState, ResultStatus, StateChanger
 
 
@@ -56,4 +57,5 @@ class StateCtlEngine:
 class _Container(containers.DeclarativeContainer):
     logger = providers.Singleton(DefaultLogger)
     filesystem = providers.Singleton(RealFileSystem)
+    process_runner = providers.Singleton(RealProcessRunner)
     engine = providers.Singleton(StateCtlEngine, logger=logger)
