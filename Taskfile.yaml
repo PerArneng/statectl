@@ -5,3 +5,21 @@ tasks:
     desc: Type-check the project with pyrefly
     cmds:
       - uv run pyrefly check
+
+  diagram:
+    desc: Module-dependency graph of statectl (pydeps) → diagrams/statectl.png
+    cmds:
+      - mkdir -p diagrams
+      - uv run pydeps statectl --noshow -T png -o diagrams/statectl.png
+
+  diagram-uml:
+    desc: UML class + package diagrams of statectl (pyreverse) → diagrams/classes_statectl.png + diagrams/packages_statectl.png
+    cmds:
+      - mkdir -p diagrams
+      - uv run pyreverse -o png -p statectl -d diagrams statectl
+
+  diagrams:
+    desc: Generate all diagrams (modules, classes, packages) into diagrams/
+    deps:
+      - diagram
+      - diagram-uml
