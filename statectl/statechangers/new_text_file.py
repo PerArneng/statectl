@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from statectl.interfaces.fs.file_system import FileSystem
+from statectl.interfaces.fs.error.fs_error import FsError
+from statectl.interfaces.fs.error.fs_not_found import FsNotFound
+from statectl.modules.fs.real_file_system import RealFileSystem
 from statectl.state_changer import (
     ExistingState,
     Parameters,
@@ -22,8 +25,13 @@ class NewTextFileParameters(Parameters):
 
 
 class NewTextFileStateChanger(RollbackableStateChanger):
-    def __init__(self, params: NewTextFileParameters) -> None:
+    def __init__(
+        self,
+        params: NewTextFileParameters,
+        file_system: FileSystem | None = None,
+    ) -> None:
         self._params = params
+        self._fs: FileSystem = file_system or RealFileSystem()
 
     def name(self) -> str:
         return f"new-text-file:{self._params.path}"
@@ -33,11 +41,11 @@ class NewTextFileStateChanger(RollbackableStateChanger):
         parent = path.parent
         issues: list[str] = []
 
-        if not parent.exists():
+        if not self._fs.exists(parent):
             issues.append(f"parent directory does not exist: {parent}")
-        elif not parent.is_dir():
+        elif not self._fs.is_dir(parent):
             issues.append(f"parent path is not a directory: {parent}")
-        elif not os.access(parent, os.W_OK):
+        elif not self._fs.is_writable(parent):
             issues.append(f"parent directory is not writable: {parent}")
 
         if issues:
@@ -47,16 +55,16 @@ class NewTextFileStateChanger(RollbackableStateChanger):
                 issues=issues,
             )
 
-        if path.exists():
-            if not path.is_file():
+        if self._fs.exists(path):
+            if not self._fs.is_file(path):
                 return StateAssessment(
                     state=ExistingState.INVALID,
                     description=f"path exists but is not a regular file: {path}",
                     issues=[f"target path exists but is not a regular file: {path}"],
                 )
             try:
-                existing = path.read_text(encoding=self._params.encoding)
-            except (OSError, UnicodeDecodeError) as e:
+                existing = self._fs.read_text_file(path, encoding=self._params.encoding)
+            except FsError as e:
                 return StateAssessment(
                     state=ExistingState.INVALID,
                     description=f"cannot read existing file at {path}",
@@ -80,34 +88,41 @@ class NewTextFileStateChanger(RollbackableStateChanger):
 
     def transition(self) -> Result:
         try:
-            self._params.path.write_text(self._params.text, encoding=self._params.encoding)
-        except OSError as e:
+            self._fs.write_text_file(
+                self._params.path, self._params.text, encoding=self._params.encoding
+            )
+        except FsError as e:
             return Result.failure("WRITE_FAILED", f"failed to write {self._params.path}: {e}")
         return Result.success(f"wrote {self._params.path}")
 
     def rollback(self) -> StateChanger:
-        return NewTextFileRollbackStateChanger(self._params)
+        return NewTextFileRollbackStateChanger(self._params, file_system=self._fs)
 
 
 class NewTextFileRollbackStateChanger(StateChanger):
-    def __init__(self, params: NewTextFileParameters) -> None:
+    def __init__(
+        self,
+        params: NewTextFileParameters,
+        file_system: FileSystem | None = None,
+    ) -> None:
         self._params = params
+        self._fs: FileSystem = file_system or RealFileSystem()
 
     def name(self) -> str:
         return f"new-text-file-rollback:{self._params.path}"
 
     def assess_state(self) -> StateAssessment:
         path = self._params.path
-        if not path.exists():
+        if not self._fs.exists(path):
             return StateAssessment(
                 state=ExistingState.ALREADY_APPLIED,
                 description=f"nothing to roll back; {path} does not exist",
             )
 
         issues: list[str] = []
-        if not path.is_file():
+        if not self._fs.is_file(path):
             issues.append(f"refusing to remove non-file path: {path}")
-        if not os.access(path.parent, os.W_OK):
+        if not self._fs.is_writable(path.parent):
             issues.append(f"parent directory is not writable: {path.parent}")
 
         if issues:
@@ -124,9 +139,9 @@ class NewTextFileRollbackStateChanger(StateChanger):
 
     def transition(self) -> Result:
         try:
-            self._params.path.unlink()
-        except FileNotFoundError:
+            self._fs.delete_file(self._params.path)
+        except FsNotFound:
             return Result.skipped(f"{self._params.path} already gone")
-        except OSError as e:
+        except FsError as e:
             return Result.failure("UNLINK_FAILED", f"failed to remove {self._params.path}: {e}")
         return Result.success(f"removed {self._params.path}")
