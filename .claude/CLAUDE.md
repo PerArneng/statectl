@@ -27,7 +27,8 @@ Three core concepts:
 - **One class per file**, filename = snake_case of class (e.g. `RealFileSystem` → `real_file_system.py`). Small private helpers / sibling dataclasses used only by that class may share the file.
 - **`__init__.py` files stay empty.** Import from the actual module path, never via package re-exports.
 - Type hints on every signature and class attribute. `assess_state()` is read-only; side effects go in `transition()` / `rollback()`.
-- **Run `task check` after completing a plan** (and periodically during longer work) to type-check the project with pyrefly. Fix any errors before reporting the task as done.
+- **`@override` on every method that overrides an ABC/parent method** (`from typing import override`). Pyrefly is configured with the **strict** preset and rejects unannotated overrides.
+- **Run `task check` after completing a plan** (and periodically during longer work) to type-check the project with pyrefly (strict). Fix any errors before reporting the task as done.
 
 ## Task-specific guides
 
@@ -35,4 +36,7 @@ Read these only when relevant to the current task:
 
 - Adding a new `StateChanger` → invoke the `new-state-changer` skill.
 - Adding a new capability (interface + module + DI wiring) → invoke the `new-capability` skill.
-- Reference implementations to read before writing similar code: `statectl/statechangers/new_text_file.py`, `statectl/interfaces/fs/` + `statectl/modules/fs/real_file_system.py`.
+- Reference implementations to read before writing similar code:
+  - `statectl/statechangers/new_text_file.py` — rollbackable, single capability, content-equivalence idempotency.
+  - `statectl/statechangers/run_command.py` — non-rollbackable, two capabilities, sentinel-based (`creates`/`removes`) idempotency.
+  - `statectl/interfaces/fs/` + `statectl/modules/fs/real_file_system.py` — capability shape (interface + typed errors + real impl + `_translate()` context manager).
