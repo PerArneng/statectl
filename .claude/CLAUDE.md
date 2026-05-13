@@ -27,6 +27,7 @@ Three core concepts:
 - **One class per file**, filename = snake_case of class (e.g. `RealFileSystem` → `real_file_system.py`). Small private helpers / sibling dataclasses used only by that class may share the file.
 - **`__init__.py` files stay empty.** Import from the actual module path, never via package re-exports.
 - Type hints on every signature and class attribute. `assess_state()` is read-only; side effects go in `transition()` / `rollback()`.
+- **Run `task check` after completing a plan** (and periodically during longer work) to type-check the project with pyrefly. Fix any errors before reporting the task as done.
 
 ## Task-specific guides
 

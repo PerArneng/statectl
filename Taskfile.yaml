@@ -1,0 +1,7 @@
+version: "3"
+
+tasks:
+  check:
+    desc: Type-check the project with pyrefly
+    cmds:
+      - uv run pyrefly check

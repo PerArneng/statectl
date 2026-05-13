@@ -19,7 +19,14 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["statectl"]
 
+[tool.pyrefly]
+project-includes = [
+    "statectl/**/*.py",
+    "statectl/**/*.ipynb",
+]
+
 [dependency-groups]
 dev = [
+    "pyrefly>=1.0.0",
     "pytest>=9.0.3",
 ]
