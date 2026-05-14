@@ -5,6 +5,7 @@ from pathlib import Path
 from statectl import StateCtl
 from statectl._interfaces.process import ProcessResult
 from statectl._statechangers import (
+    EnsureDirectoryStateChanger,
     NewTextFileRollbackStateChanger,
     NewTextFileStateChanger,
     RunCommandStateChanger,
@@ -52,6 +53,22 @@ def test_new_file_rollback_inherits_fake_filesystem() -> None:
     engine.start(max_workers=1)
 
     assert not fs.exists(Path("/work/out.txt"))
+
+
+def test_ensure_directory_routes_through_fake_filesystem() -> None:
+    fs = InMemoryFileSystem()
+    fs.add_dir(Path("/work"))
+    pr = ScriptedProcessRunner()
+    engine = StateCtl.new(file_system=fs, process_runner=pr)
+
+    changer = engine.changers().ensure_directory("/work/a/b", mode=0o700)
+    assert isinstance(changer, EnsureDirectoryStateChanger)
+
+    engine.add(changer)
+    engine.start(max_workers=1)
+
+    assert fs.is_dir(Path("/work/a/b"))
+    assert fs.stat_mode(Path("/work/a/b")) == 0o700
 
 
 def test_run_shlex_splits_string_command() -> None:

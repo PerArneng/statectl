@@ -6,6 +6,10 @@ from typing import Iterable, Mapping, Sequence
 
 from statectl._interfaces.fs import FileSystem
 from statectl._interfaces.process import ProcessRunner
+from statectl._statechangers.ensure_directory import (
+    EnsureDirectoryParameters,
+    EnsureDirectoryStateChanger,
+)
 from statectl._statechangers.new_text_file import (
     NewTextFileParameters,
     NewTextFileStateChanger,
@@ -24,6 +28,18 @@ class StateChangers:
     ) -> None:
         self._fs: FileSystem = file_system
         self._pr: ProcessRunner = process_runner
+
+    def ensure_directory(
+        self,
+        path: str | Path,
+        *,
+        mode: int | None = None,
+        parents: bool = True,
+    ) -> EnsureDirectoryStateChanger:
+        return EnsureDirectoryStateChanger(
+            EnsureDirectoryParameters(path=Path(path), mode=mode, parents=parents),
+            file_system=self._fs,
+        )
 
     def new_file(
         self,

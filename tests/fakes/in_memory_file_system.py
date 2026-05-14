@@ -15,12 +15,17 @@ from statectl._interfaces.fs import (
 )
 
 
+_DEFAULT_DIR_MODE = 0o755
+_DEFAULT_FILE_MODE = 0o644
+
+
 @dataclass
 class _Node:
     is_dir: bool
     content: str = ""
     writable: bool = True
     readable_text: bool = True
+    mode: int = _DEFAULT_FILE_MODE
 
 
 @dataclass
@@ -36,8 +41,8 @@ class InMemoryFileSystem(FileSystem):
     _temp_counter: int = 0
     temp_root: Path = Path("/tmp")
 
-    def add_dir(self, path: Path, writable: bool = True) -> None:
-        self._nodes[path] = _Node(is_dir=True, writable=writable)
+    def add_dir(self, path: Path, writable: bool = True, mode: int = _DEFAULT_DIR_MODE) -> None:
+        self._nodes[path] = _Node(is_dir=True, writable=writable, mode=mode)
 
     def add_file(
         self,
@@ -45,6 +50,7 @@ class InMemoryFileSystem(FileSystem):
         content: str = "",
         writable: bool | None = None,
         readable_text: bool = True,
+        mode: int = _DEFAULT_FILE_MODE,
     ) -> None:
         parent_writable = True
         if path.parent in self._nodes:
@@ -54,6 +60,7 @@ class InMemoryFileSystem(FileSystem):
             content=content,
             writable=parent_writable if writable is None else writable,
             readable_text=readable_text,
+            mode=mode,
         )
 
     def set_writable(self, path: Path, writable: bool) -> None:
@@ -61,6 +68,9 @@ class InMemoryFileSystem(FileSystem):
 
     def set_readable_text(self, path: Path, readable_text: bool) -> None:
         self._nodes[path].readable_text = readable_text
+
+    def set_mode(self, path: Path, mode: int) -> None:
+        self._nodes[path].mode = mode
 
     def exists(self, path: Path) -> bool:
         return path in self._nodes
@@ -76,6 +86,21 @@ class InMemoryFileSystem(FileSystem):
     def is_writable(self, path: Path) -> bool:
         node = self._nodes.get(path)
         return node is not None and node.writable
+
+    def is_empty_dir(self, path: Path) -> bool:
+        node = self._nodes.get(path)
+        if node is None or not node.is_dir:
+            return False
+        for p in self._nodes:
+            if p.parent == path and p != path:
+                return False
+        return True
+
+    def stat_mode(self, path: Path) -> int | None:
+        node = self._nodes.get(path)
+        if node is None:
+            return None
+        return node.mode & 0o7777
 
     def read_text_file(self, path: Path, encoding: str = "utf-8") -> str:
         node = self._nodes.get(path)
@@ -140,7 +165,13 @@ class InMemoryFileSystem(FileSystem):
             self.create_folder(path.parent, parents=True, exist_ok=True)
         if not self._nodes[path.parent].is_dir:
             raise FsNotADirectory("parent is not a directory", path=path.parent)
-        self._nodes[path] = _Node(is_dir=True, writable=True)
+        self._nodes[path] = _Node(is_dir=True, writable=True, mode=_DEFAULT_DIR_MODE)
+
+    def chmod(self, path: Path, mode: int) -> None:
+        node = self._nodes.get(path)
+        if node is None:
+            raise FsNotFound("path not found", path=path)
+        node.mode = mode & 0o7777
 
     def delete_folder(self, path: Path, recursive: bool = False) -> None:
         node = self._nodes.get(path)

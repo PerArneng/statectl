@@ -16,7 +16,7 @@ class FileEntry:
 class FileSystem(ABC):
     """Filesystem abstraction. All mutating / reading methods raise FsError
     subclasses on failure; query methods (exists / is_file / is_dir /
-    is_writable) return bool and never raise.
+    is_writable / is_empty_dir / stat_mode) never raise.
 
     Implementations must translate underlying errors into:
       - FsNotFound          path is missing when required
@@ -41,6 +41,12 @@ class FileSystem(ABC):
     def is_writable(self, path: Path) -> bool: ...
 
     @abstractmethod
+    def is_empty_dir(self, path: Path) -> bool: ...
+
+    @abstractmethod
+    def stat_mode(self, path: Path) -> int | None: ...
+
+    @abstractmethod
     def read_text_file(self, path: Path, encoding: str = "utf-8") -> str: ...
 
     @abstractmethod
@@ -57,6 +63,9 @@ class FileSystem(ABC):
 
     @abstractmethod
     def delete_folder(self, path: Path, recursive: bool = False) -> None: ...
+
+    @abstractmethod
+    def chmod(self, path: Path, mode: int) -> None: ...
 
     @abstractmethod
     def create_temp_folder(self, prefix: str | None = None) -> Path: ...
