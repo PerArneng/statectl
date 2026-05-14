@@ -3,8 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Mapping, Sequence, override
 
-from statectl.interfaces.process.process_result import ProcessResult
-from statectl.interfaces.process.process_runner import ProcessRunner
+from statectl.interfaces.process import (
+    ProcessResult,
+    ProcessRunner,
+)
 
 
 class FailingProcessRunner(ProcessRunner):

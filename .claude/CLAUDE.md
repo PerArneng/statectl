@@ -15,7 +15,7 @@ Three core concepts:
 
 - `statectl/state_changer.py` — core ABCs + `Parameters`, `StateAssessment`, `ExistingState`, `Result`, `ResultStatus`.
 - `statectl/state_ctl_engine.py` — `StateCtlEngine` and its private DI container.
-- `statectl/interfaces/<capability>/` — ABCs for side-effecting capabilities (e.g. `fs/`, `logger.py`) plus typed errors under `error/`.
+- `statectl/interfaces/<capability>/` — ABCs for side-effecting capabilities (e.g. `fs/`, `logger.py`) plus the typed error hierarchy in `<capability>_errors.py` (e.g. `fs_errors.py`, `process_errors.py`).
 - `statectl/modules/<capability>/` — concrete implementations of those interfaces (e.g. `fs/real_file_system.py`).
 - `statectl/statechangers/` — concrete `StateChanger` implementations.
 - `tests/fakes/` — in-memory / failing fakes used in tests.
@@ -26,8 +26,8 @@ Three core concepts:
 - **No stdlib IO in state changers or modules.** Any filesystem/network/process/clock/env call goes behind an interface in `statectl/interfaces/` with a real impl in `statectl/modules/`. See the `new-capability` skill.
 - **Wiring split:** the DI `_Container` wires only engine-internal singletons (logger, engine). State changers are wired manually by the driver — they accept capabilities as constructor kwargs and default `None` to the real impl (e.g. `RealFileSystem()`) so trivial driver code stays terse. Tests inject fakes through the same kwargs. This means it's expected and intentional for `statechangers/*.py` to import from `statectl/modules/`.
 - **No real IO in tests.** Tests drive state changers through fakes (`tests/fakes/`). A test that touches the real disk, network, or process table is a bug.
-- **One class per file**, filename = snake_case of class (e.g. `RealFileSystem` → `real_file_system.py`). Small private helpers / sibling dataclasses used only by that class may share the file.
-- **`__init__.py` files stay empty.** Import from the actual module path, never via package re-exports.
+- **Top-level types live in their own file** (snake_case name; `RealFileSystem` → `real_file_system.py`). Tightly-coupled groups — error hierarchies, small value-object clusters — share one file named `<group>.py` (e.g. `fs_errors.py` holds `FsError` and all its variants). Small private helpers used only by one class may share that class's file.
+- **`__init__.py` is the curated public surface of its package.** Each subpackage's `__init__.py` re-exports its classes with `__all__` using relative imports (`from .file_system import FileSystem as FileSystem`). Callers (tests, examples, cross-subpackage source) import from the package: `from statectl.interfaces.fs import FileSystem, FsNotFound`. Exception: top-level types (`StateChanger`, `Result`, `ExecutionNode`, `StateCtlEngine`, …) are imported from their file (`from statectl.state_changer import StateChanger`) inside source files under `statectl/` to avoid `statectl/__init__.py` circular-load issues. External code (tests, examples) imports them from `statectl` directly: `from statectl import StateChanger, ExecutionNode`.
 - Type hints on every signature and class attribute. `assess_state()` is read-only; side effects go in `transition()` / `rollback()`.
 - **`@override` on every method that overrides an ABC/parent method** (`from typing import override`). Pyrefly is configured with the **strict** preset and rejects unannotated overrides.
 - **Run `task check` after completing a plan** (and periodically during longer work) to type-check the project with pyrefly (strict). Fix any errors before reporting the task as done.
@@ -41,4 +41,4 @@ Read these only when relevant to the current task:
 - Reference implementations to read before writing similar code:
   - `statectl/statechangers/new_text_file.py` — rollbackable, single capability, content-equivalence idempotency.
   - `statectl/statechangers/run_command.py` — non-rollbackable, two capabilities, sentinel-based (`creates`/`removes`) idempotency.
-  - `statectl/interfaces/fs/` + `statectl/modules/fs/real_file_system.py` — capability shape (interface + typed errors + real impl + `_translate()` context manager).
+  - `statectl/interfaces/fs/` (ABC + `fs_errors.py` + `__init__.py` re-exports) + `statectl/modules/fs/real_file_system.py` — capability shape (interface + typed errors + real impl + `_translate()` context manager).

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from statectl.interfaces.fs.error.fs_io_error import FsIoError
-from statectl.state_changer import ResultStatus, RollbackableStateChanger
-from statectl.statechangers.new_text_file import (
+from statectl.interfaces.fs import FsIoError
+from statectl import ResultStatus, RollbackableStateChanger
+from statectl.statechangers import (
     NewTextFileParameters,
     NewTextFileStateChanger,
 )

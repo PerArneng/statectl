@@ -9,8 +9,9 @@ A capability is any side-effecting concern (filesystem, network, HTTP, process e
 
 The reference example is the filesystem capability:
 - Interface: `statectl/interfaces/fs/file_system.py` (`FileSystem`)
-- Typed errors: `statectl/interfaces/fs/error/` (`FsError` base + leaf classes)
-- Real implementation: `statectl/modules/fs/real_file_system.py` (`RealFileSystem`)
+- Typed errors: `statectl/interfaces/fs/fs_errors.py` (`FsError` base + all variants in one file)
+- Public surface: `statectl/interfaces/fs/__init__.py` (re-exports the ABC, value types, and every error with `__all__`)
+- Real implementation: `statectl/modules/fs/real_file_system.py` (`RealFileSystem`), re-exported from `statectl/modules/fs/__init__.py`
 - DI registration: `statectl/state_ctl_engine.py` `_Container.filesystem = providers.Singleton(RealFileSystem)`
 
 Read those files before adding a new capability — mirror their shape.
@@ -21,7 +22,7 @@ Read those files before adding a new capability — mirror their shape.
 
 Create `statectl/interfaces/<capability>/<capability>.py` with an ABC. One class per file. Methods describe the capability in domain terms (not stdlib terms — `which` / `run`, not `subprocess_run`). Type-hint every signature.
 
-Small sibling dataclasses or value types used by this interface (e.g. `FileEntry`, `ProcessResult`) **live in their own files** in the same directory — one class per file, snake_case filename. Don't bundle them into the interface module.
+Small sibling dataclasses or value types used by this interface (e.g. `FileEntry`, `ProcessResult`) live in their own files in the same directory (snake_case filename). Re-export them alongside the interface from the capability's `__init__.py`.
 
 **Split methods into query vs action.** This is the load-bearing convention:
 
@@ -32,13 +33,13 @@ Don't conflate "failure" with "non-success result." A 4xx HTTP response or a non
 
 ### 2. Define typed errors
 
-Create `statectl/interfaces/<capability>/error/<capability>_error.py` with a base exception class. Add leaf classes (one per file) for each distinct failure mode the interface can raise — e.g. `FsNotFound`, `FsPermissionDenied`, `FsAlreadyExists`, `ProcessNotFound`, `ProcessTimeout`. Callers catch the base; the leaves carry detail.
+Create `statectl/interfaces/<capability>/<capability>_errors.py` with the base exception class **and every variant in the same file** — e.g. `FsError` plus `FsNotFound`, `FsPermissionDenied`, `FsAlreadyExists`, …; or `ProcessError` plus `ProcessNotFound`, `ProcessTimeout`, …. Callers catch the base; the variants carry detail. Re-export every class from the capability's `__init__.py`.
 
 The real implementation is responsible for translating stdlib exceptions into these typed errors so callers never see `OSError`/`FileNotFoundError`/`subprocess.TimeoutExpired`/etc.
 
 ### 3. Implement the real module
 
-Create `statectl/modules/<capability>/real_<capability>.py` with the concrete class. It may import only from `statectl.interfaces.*` — never from another concrete module. If it needs another capability, take it as a constructor parameter typed against that interface.
+Create `statectl/modules/<capability>/real_<capability>.py` with the concrete class, and re-export it from `statectl/modules/<capability>/__init__.py` (`from .real_<capability> import Real<Capability> as Real<Capability>` + `__all__`). It may import only from `statectl.interfaces.*` — never from another concrete module. If it needs another capability, take it as a constructor parameter typed against that interface.
 
 Every method that implements an interface method needs `@override` (`from typing import override`) — strict pyrefly enforces it.
 
@@ -71,8 +72,10 @@ The canonical test setup composes them: `FailingFs(InMemoryFs(...))` / `FailingP
 
 - [ ] Interface ABC under `statectl/interfaces/<capability>/`, methods in domain terms, query vs action split
 - [ ] Sibling value types (`ProcessResult`-style) in their own files in the same directory
-- [ ] Typed error hierarchy under `statectl/interfaces/<capability>/error/` (one class per file, base + leaves)
+- [ ] Typed error hierarchy in one file: `statectl/interfaces/<capability>/<capability>_errors.py` (base + all variants)
+- [ ] `statectl/interfaces/<capability>/__init__.py` re-exports the ABC, value types, and every error with `__all__` (relative imports)
 - [ ] Real implementation under `statectl/modules/<capability>/real_<capability>.py` translating stdlib exceptions to typed errors via a `_translate()` context manager (see `RealFileSystem`)
+- [ ] `statectl/modules/<capability>/__init__.py` re-exports the real impl with `__all__`
 - [ ] `@override` on every overriding method in the real implementation
 - [ ] `providers.Singleton(...)` entry in `_Container`
 - [ ] Two fakes under `tests/fakes/` — rich in-memory/scripted + thin failure-injector wrapper

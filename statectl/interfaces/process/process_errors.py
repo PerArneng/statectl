@@ -14,3 +14,19 @@ class ProcessError(Exception):
         if self.argv is not None:
             return f"{self.message}: {' '.join(self.argv)}"
         return self.message
+
+
+class ProcessDecodeError(ProcessError):
+    pass
+
+
+class ProcessLaunchError(ProcessError):
+    pass
+
+
+class ProcessNotFound(ProcessError):
+    pass
+
+
+class ProcessTimeout(ProcessError):
+    pass

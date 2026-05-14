@@ -4,13 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from statectl.interfaces.fs.error.fs_io_error import FsIoError
-from statectl.state_changer import (
+from statectl.interfaces.fs import FsIoError
+from statectl import (
     ExistingState,
     ResultStatus,
     RollbackableStateChanger,
 )
-from statectl.statechangers.new_text_file import (
+from statectl.statechangers import (
     NewTextFileParameters,
     NewTextFileStateChanger,
 )

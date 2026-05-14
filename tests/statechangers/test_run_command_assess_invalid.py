@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from statectl.state_changer import ExistingState
-from statectl.statechangers.run_command import (
+from statectl import ExistingState
+from statectl.statechangers import (
     RunCommandParameters,
     RunCommandStateChanger,
 )

@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from statectl.interfaces.process.process_result import ProcessResult
-from statectl.state_changer import ResultStatus
-from statectl.statechangers.run_command import (
+from statectl.interfaces.process import ProcessResult
+from statectl import ResultStatus
+from statectl.statechangers import (
     RunCommandParameters,
     RunCommandStateChanger,
 )

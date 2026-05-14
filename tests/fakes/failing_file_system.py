@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from statectl.interfaces.fs.error.fs_error import FsError
-from statectl.interfaces.fs.file_entry import FileEntry
-from statectl.interfaces.fs.file_system import FileSystem
+from statectl.interfaces.fs import (
+    FileEntry,
+    FileSystem,
+    FsError,
+)
 
 
 class FailingFileSystem(FileSystem):

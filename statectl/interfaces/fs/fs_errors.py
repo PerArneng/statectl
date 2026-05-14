@@ -15,3 +15,31 @@ class FsError(Exception):
         if self.path is not None:
             return f"{self.message}: {self.path}"
         return self.message
+
+
+class FsAlreadyExists(FsError):
+    pass
+
+
+class FsDecodeError(FsError):
+    pass
+
+
+class FsIoError(FsError):
+    pass
+
+
+class FsNotADirectory(FsError):
+    pass
+
+
+class FsNotAFile(FsError):
+    pass
+
+
+class FsNotFound(FsError):
+    pass
+
+
+class FsPermissionDenied(FsError):
+    pass

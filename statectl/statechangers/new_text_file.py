@@ -4,10 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
-from statectl.interfaces.fs.file_system import FileSystem
-from statectl.interfaces.fs.error.fs_error import FsError
-from statectl.interfaces.fs.error.fs_not_found import FsNotFound
-from statectl.modules.fs.real_file_system import RealFileSystem
+from statectl.interfaces.fs import FileSystem, FsError, FsNotFound
+from statectl.modules.fs import RealFileSystem
 from statectl.state_changer import (
     ExistingState,
     Parameters,

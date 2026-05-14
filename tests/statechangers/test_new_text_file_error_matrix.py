@@ -4,16 +4,18 @@ from pathlib import Path
 
 import pytest
 
-from statectl.interfaces.fs.error.fs_already_exists import FsAlreadyExists
-from statectl.interfaces.fs.error.fs_decode_error import FsDecodeError
-from statectl.interfaces.fs.error.fs_error import FsError
-from statectl.interfaces.fs.error.fs_io_error import FsIoError
-from statectl.interfaces.fs.error.fs_not_a_directory import FsNotADirectory
-from statectl.interfaces.fs.error.fs_not_a_file import FsNotAFile
-from statectl.interfaces.fs.error.fs_not_found import FsNotFound
-from statectl.interfaces.fs.error.fs_permission_denied import FsPermissionDenied
-from statectl.state_changer import ExistingState, ResultStatus, RollbackableStateChanger
-from statectl.statechangers.new_text_file import (
+from statectl.interfaces.fs import (
+    FsAlreadyExists,
+    FsDecodeError,
+    FsError,
+    FsIoError,
+    FsNotADirectory,
+    FsNotAFile,
+    FsNotFound,
+    FsPermissionDenied,
+)
+from statectl import ExistingState, ResultStatus, RollbackableStateChanger
+from statectl.statechangers import (
     NewTextFileParameters,
     NewTextFileStateChanger,
 )

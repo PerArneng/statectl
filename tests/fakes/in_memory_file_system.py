@@ -3,14 +3,16 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from statectl.interfaces.fs.error.fs_already_exists import FsAlreadyExists
-from statectl.interfaces.fs.error.fs_decode_error import FsDecodeError
-from statectl.interfaces.fs.error.fs_io_error import FsIoError
-from statectl.interfaces.fs.error.fs_not_a_directory import FsNotADirectory
-from statectl.interfaces.fs.error.fs_not_a_file import FsNotAFile
-from statectl.interfaces.fs.error.fs_not_found import FsNotFound
-from statectl.interfaces.fs.file_entry import FileEntry
-from statectl.interfaces.fs.file_system import FileSystem
+from statectl.interfaces.fs import (
+    FileEntry,
+    FileSystem,
+    FsAlreadyExists,
+    FsDecodeError,
+    FsIoError,
+    FsNotADirectory,
+    FsNotAFile,
+    FsNotFound,
+)
 
 
 @dataclass

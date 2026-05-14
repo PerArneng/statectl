@@ -4,9 +4,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping, Sequence, override
 
-from statectl.interfaces.process.error.process_not_found import ProcessNotFound
-from statectl.interfaces.process.process_result import ProcessResult
-from statectl.interfaces.process.process_runner import ProcessRunner
+from statectl.interfaces.process import (
+    ProcessNotFound,
+    ProcessResult,
+    ProcessRunner,
+)
 
 
 @dataclass(frozen=True)

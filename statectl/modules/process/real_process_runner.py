@@ -6,12 +6,14 @@ import time
 from pathlib import Path
 from typing import Mapping, Sequence, override
 
-from statectl.interfaces.process.error.process_decode_error import ProcessDecodeError
-from statectl.interfaces.process.error.process_launch_error import ProcessLaunchError
-from statectl.interfaces.process.error.process_not_found import ProcessNotFound
-from statectl.interfaces.process.error.process_timeout import ProcessTimeout
-from statectl.interfaces.process.process_result import ProcessResult
-from statectl.interfaces.process.process_runner import ProcessRunner
+from statectl.interfaces.process import (
+    ProcessDecodeError,
+    ProcessLaunchError,
+    ProcessNotFound,
+    ProcessResult,
+    ProcessRunner,
+    ProcessTimeout,
+)
 
 
 class RealProcessRunner(ProcessRunner):

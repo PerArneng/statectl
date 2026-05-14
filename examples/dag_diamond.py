@@ -10,9 +10,9 @@ import logging
 import tempfile
 from pathlib import Path
 
-from statectl.execution_node import ExecutionNode
-from statectl.state_ctl_engine import StateCtlEngine
-from statectl.statechangers.new_text_file import (
+from statectl import ExecutionNode
+from statectl import StateCtlEngine
+from statectl.statechangers import (
     NewTextFileParameters,
     NewTextFileStateChanger,
 )

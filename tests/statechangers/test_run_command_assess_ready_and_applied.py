@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from statectl.state_changer import ExistingState
-from statectl.statechangers.run_command import (
+from statectl import ExistingState
+from statectl.statechangers import (
     RunCommandParameters,
     RunCommandStateChanger,
 )
