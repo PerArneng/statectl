@@ -58,6 +58,21 @@ class RealFileSystem(FileSystem):
         return os.access(path, os.W_OK)
 
     @override
+    def is_empty_dir(self, path: Path) -> bool:
+        try:
+            with os.scandir(path) as it:
+                return next(it, None) is None
+        except OSError:
+            return False
+
+    @override
+    def stat_mode(self, path: Path) -> int | None:
+        try:
+            return path.stat().st_mode & 0o7777
+        except OSError:
+            return None
+
+    @override
     def read_text_file(self, path: Path, encoding: str = "utf-8") -> str:
         with _translate(path):
             return path.read_text(encoding=encoding)
@@ -92,6 +107,11 @@ class RealFileSystem(FileSystem):
                 shutil.rmtree(path)
             else:
                 path.rmdir()
+
+    @override
+    def chmod(self, path: Path, mode: int) -> None:
+        with _translate(path):
+            path.chmod(mode)
 
     @override
     def create_temp_folder(self, prefix: str | None = None) -> Path:

@@ -43,6 +43,12 @@ class FailingFileSystem(FileSystem):
     def is_writable(self, path: Path) -> bool:
         return self._inner.is_writable(path)
 
+    def is_empty_dir(self, path: Path) -> bool:
+        return self._inner.is_empty_dir(path)
+
+    def stat_mode(self, path: Path) -> int | None:
+        return self._inner.stat_mode(path)
+
     def read_text_file(self, path: Path, encoding: str = "utf-8") -> str:
         self._maybe_fail("read_text_file", path)
         return self._inner.read_text_file(path, encoding=encoding)
@@ -66,6 +72,10 @@ class FailingFileSystem(FileSystem):
     def delete_folder(self, path: Path, recursive: bool = False) -> None:
         self._maybe_fail("delete_folder", path)
         self._inner.delete_folder(path, recursive=recursive)
+
+    def chmod(self, path: Path, mode: int) -> None:
+        self._maybe_fail("chmod", path)
+        self._inner.chmod(path, mode)
 
     def create_temp_folder(self, prefix: str | None = None) -> Path:
         self._maybe_fail("create_temp_folder", None)
