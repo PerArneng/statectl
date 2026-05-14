@@ -41,10 +41,15 @@ Repo uses the **`src/` layout** — the importable package lives at `src/statect
 - **`@override` on every method that overrides an ABC/parent method** (`from typing import override`). Pyrefly is configured with the **strict** preset and rejects unannotated overrides.
 - **Run `task check` after completing a plan** (and periodically during longer work) to type-check the project with pyrefly (strict). Fix any errors before reporting the task as done.
 
+## Work tracking
+
+Work is driven by **GitHub Issues** on `PerArneng/statectl`, organized on a Project v2 Kanban board (`Todo` → `In Progress` → `Done`) at https://github.com/users/PerArneng/projects/1. The roadmap (`docs/roadmap.md`) is the source of truth for what to build; each item there has a matching issue with `tier-N` and `kind:*` labels. Before starting code, move the card to `In Progress` and link a branch; on merge, `Closes #N` in the PR moves it to `Done`. For the full workflow (URLs, GraphQL mutations, branch naming) → invoke the `github-task-workflow` skill.
+
 ## Task-specific guides
 
 Read these only when relevant to the current task:
 
+- Picking up / progressing / closing a roadmap issue → invoke the `github-task-workflow` skill.
 - Adding a new `StateChanger` → invoke the `new-state-changer` skill.
 - Adding a new capability (interface + module + DI wiring) → invoke the `new-capability` skill.
 - Reference implementations to read before writing similar code:

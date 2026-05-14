@@ -60,6 +60,65 @@ class YourParameters(Parameters):
     # add fields with defaults last
 ```
 
+### Parameters must be self-sufficient for `assess_state`
+
+This is the most easily-missed property of a well-designed `Parameters`. The rule:
+
+> **`Parameters` must encode every choice `transition` will make** — not just the desired end state, but also the placement / identity / disambiguation rules that locate where the change applies. And `assess_state` must verify every assumption `transition` will rely on — including the ambiguity cases (zero matches, multiple matches, anchor missing).
+
+Why this matters: the engine assesses **once** and acts **once** based on that assessment. If `transition` has to guess at runtime (pick "the right" regex match, default to the end of the file when an anchor is ambiguous, choose a port when one isn't specified), then the post-state isn't determined by the inputs and the changer is no longer idempotent — re-running can land in a different state than the first run, and `ALREADY_APPLIED` detection becomes unreliable.
+
+Practical test: read the Parameters dataclass alone. Can a reader predict the final byte-for-byte state of the affected resource? If "it depends on what's there" applies to anything besides whether the changer needs to run at all, the parameters are underspecified.
+
+**Worked example — `EnsureLineInFile`.** Naïve params look like `(path, line)`. That's underspecified: where does the line go? At the end? After a specific section? The fix is to make placement part of the contract:
+
+```python
+@dataclass(frozen=True)
+class AfterRegex:
+    pattern: str          # must match exactly one line
+
+@dataclass(frozen=True)
+class BeforeRegex:
+    pattern: str
+
+@dataclass(frozen=True)
+class AtEnd: ...
+
+@dataclass(frozen=True)
+class AtStart: ...
+
+Placement = AfterRegex | BeforeRegex | AtEnd | AtStart
+
+@dataclass(frozen=True)
+class EnsureLineInFileParameters(Parameters):
+    path: Path
+    line: str
+    placement: Placement
+    strict_anchor: bool = True   # if False, "line already present elsewhere" → ALREADY_APPLIED
+```
+
+`assess_state` then collects (as one pass, per the standard rule):
+
+- `path` doesn't exist / isn't a file / isn't writable → INVALID
+- placement is `AfterRegex(p)` and `p` matches **0** lines → INVALID ("anchor not found")
+- placement is `AfterRegex(p)` and `p` matches **>1** lines → INVALID ("anchor is ambiguous, matches N lines")
+- the line is already present at the exact insertion point implied by `placement` → ALREADY_APPLIED
+- the line is present in the file but not at the anchor:
+  - if `strict_anchor=True` → INVALID ("line exists at wrong location: line N")
+  - if `strict_anchor=False` → ALREADY_APPLIED
+- otherwise → READY
+
+Notice how every disambiguation that `transition` would otherwise face has been pushed up into either the Parameters (the `placement` choice, the `strict_anchor` toggle) or the assessment (the multi-match / zero-match INVALID branches). `transition` itself becomes mechanical: re-read the file, locate the single anchor (or end/start), splice the line, write back.
+
+**Smell list — signs your Parameters are underspecified:**
+
+- `transition` contains "if X then Y else Z" branches that depend on *current state* in a way that changes the resulting state (not just whether to act).
+- A second run after a successful first run can produce a different end state.
+- `assess_state` can't enumerate every INVALID case because some are only discoverable at apply time.
+- Two reasonable people would write different `transition` code for the same `Parameters` because something was left to interpretation.
+
+When in doubt, prefer **more explicit Parameters** over a clever changer. A `Placement` ADT or a `match_strategy: Literal["unique", "first", "last"]` field is cheaper than debugging a non-idempotent changer in production.
+
 ## Choosing the base class
 
 - **`StateChanger`** — one-shot operation, no meaningful inverse. Examples: emit a log line, fire-and-forget API call, restart a process, run an arbitrary command.
