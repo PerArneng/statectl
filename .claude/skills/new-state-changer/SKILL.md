@@ -183,12 +183,16 @@ The inverse class:
 You don't have to wire anything new — drivers consume your changer like any other:
 
 ```python
-engine = StateCtl.new()
-engine.add(YourStateChanger(YourParameters(...)))
-engine.start()
+ctl = StateCtl.new()
+ctl.add(YourStateChanger(YourParameters(...)))
+ctl.start()
 ```
 
 The engine logs each step via the injected `Logger`, halts on `INVALID` or transition `FAILURE`, and skips on `ALREADY_APPLIED`.
+
+### Optional: surface it through the `StateChangers` factory
+
+If your changer is a candidate for the ergonomic built-in surface, add a method to `src/statectl/statechangers/state_changers.py` that flattens its `Parameters` into keyword args, coerces `str | Path` etc. at the boundary, and threads `self._fs` / `self._pr` to the constructor. This is optional — custom / project-specific changers can stay outside the factory and be constructed directly as shown above.
 
 ## Tests are part of the deliverable
 

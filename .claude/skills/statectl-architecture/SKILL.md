@@ -53,8 +53,9 @@ Three layers, with dependencies flowing strictly downward:
 
 **Wiring split — read this carefully, it's a common point of confusion:**
 
-- The **DI container** (`_Container` at the bottom of `state_ctl.py`) wires only **engine-internal** singletons: the logger and the engine itself. It also declares `filesystem` and `process_runner` providers, but those exist as a convenience — the engine doesn't inject them into state changers.
-- **State changers are wired manually by the driver.** Each changer accepts its capabilities as constructor kwargs and defaults `None` to the real impl (e.g. `self._fs: FileSystem = file_system or RealFileSystem()`). This keeps driver code terse — `NewTextFileStateChanger(params)` just works — while tests inject fakes through the same kwargs.
+- The **DI container** (`_Container` at the bottom of `state_ctl.py`) wires engine-internal singletons: `logger`, `filesystem`, `process_runner`, and the `engine` itself. The capabilities are threaded into the `StateCtl` constructor (`StateCtl(logger=…, file_system=…, process_runner=…)`). `StateCtl.new(file_system=…, process_runner=…)` lets tests override the providers.
+- **The engine owns the capabilities and exposes them via `ctl.changers()`** → a `StateChangers` factory whose methods (`new_file`, `run`, …) flatten the `Parameters` + `StateChanger` ceremony and thread the engine's fs/process-runner through to each changer. This is the recommended driver path for built-in changers.
+- **State changers also still accept capabilities as constructor kwargs**, defaulting `None` to the real impl (e.g. `self._fs: FileSystem = file_system or RealFileSystem()`). This is the path the factory uses internally and the path drivers use when constructing a changer by hand (or when tests inject fakes per-changer).
 - **Consequence:** it is *expected and intentional* that `statechangers/*.py` imports concrete classes from `src/statectl/modules/` for those defaults. The package-level dependency graph will show `statechangers/ → modules/` edges; these are not a layering violation, they are the ergonomic seam.
 
 If you ever need a capability to be a true singleton shared across changers (e.g. a connection pool, a clock with a fixed epoch), promote it: have the driver construct it once and pass it into each changer explicitly. Don't add it to `_Container` and don't reach into the container from a changer.
@@ -93,7 +94,8 @@ src/statectl/
 │   └── real_process_runner.py
 │
 └── statechangers/              # Concrete StateChanger implementations
-    ├── __init__.py             # re-exports all concrete changers + Parameters
+    ├── __init__.py             # re-exports all concrete changers + Parameters + StateChangers
+    ├── state_changers.py       # StateChangers factory — ergonomic surface for built-in changers
     ├── new_text_file.py        # rollbackable, single capability
     └── run_command.py          # non-rollbackable, multi-capability, sentinel idempotency
 
@@ -161,17 +163,21 @@ Keeping `ExecutionNode` private means changers stay pure (no graph state on them
 
 ### `StateCtl` (`src/statectl/state_ctl.py`)
 
-Orchestrator. The driver-facing API is just `add` + `start`:
+Orchestrator. The driver-facing API is `changers()` + `add` + `start`:
 
 ```python
-a = NewTextFileStateChanger(params_a)
-b = NewTextFileStateChanger(params_b)
+ctl = StateCtl.new()
+sc = ctl.changers()
 
-engine = StateCtl.new()
-engine.add(a)
-engine.add(b, depends_on=[a])    # 'a' must already be added
-result = engine.start(max_workers=4)
+a = sc.new_file("/tmp/a.txt", "a\n")
+b = sc.new_file("/tmp/b.txt", "b\n")
+
+ctl.add(a)
+ctl.add(b, depends_on=[a])       # 'a' must already be added
+result = ctl.start(max_workers=4)
 ```
+
+Direct construction (`NewTextFileStateChanger(NewTextFileParameters(...))`) still works and is the path for custom changers not yet surfaced through `StateChangers`.
 
 **Configuration errors are raised eagerly at `add()` time, before any changer runs:**
 - Same changer instance added twice → `DuplicateNodeError`.
@@ -185,7 +191,20 @@ These are the *only* configuration errors. **Cycles are structurally impossible*
 - **Fail-isolation:** when a node returns `FAILED_INVALID` or `FAILED_TRANSITION`, its transitive descendants are BFS-marked `BLOCKED` and never submitted. Sibling branches keep running.
 - Final `EngineResult.ok` is False iff any node ended in a failure or blocked state.
 
-`StateCtl.new()` is the recommended construction path — it uses the `_Container` and wires the real logger. Driver code rarely needs to inject capabilities by hand; changers accept capabilities as constructor kwargs with `None` → real-impl defaults.
+`StateCtl.new()` is the recommended construction path — it uses the `_Container` and wires the real logger, filesystem, and process runner. For tests, `StateCtl.new(file_system=fake_fs, process_runner=fake_pr)` overrides the providers so the engine (and any changer obtained via `ctl.changers()`) sees the fakes.
+
+### `StateChangers` (`src/statectl/statechangers/state_changers.py`)
+
+Ergonomic factory for the built-in changers, obtained via `ctl.changers()`. Methods flatten the `Parameters` + `StateChanger` two-step and thread the engine's capabilities through:
+
+```python
+sc = ctl.changers()
+sc.new_file("/tmp/x.txt", "hi")           # → NewTextFileStateChanger
+sc.run("ls -la")                          # → RunCommandStateChanger (shlex-split string)
+sc.run(["echo", "hi there"], creates=p)  # → RunCommandStateChanger (sequence form)
+```
+
+Coercions at the boundary: `str | Path` paths are wrapped to `Path`; `Iterable[int]` exit codes are frozen; a string command is `shlex.split`, a sequence is taken verbatim. The factory is **not** re-exported from top-level `statectl` — the engine is the public entry point, and that direction will tighten further (hiding the concrete changer/Parameters classes too) as the library matures.
 
 ### `NodeOutcome` / `NodeReport` / `EngineResult` (`src/statectl/engine_result.py`)
 

@@ -47,6 +47,8 @@ Every method that implements an interface method needs `@override` (`from typing
 
 In `src/statectl/state_ctl.py`, add a `providers.Singleton(<RealImpl>)` entry to `_Container`, mirroring `logger` and `filesystem`. If the implementation depends on other capabilities, pass them as provider references.
 
+**If state changers (or the `StateChangers` factory) need this capability at runtime**, also: (a) add it to the `StateCtl.__init__` signature and thread it from the `engine` provider, (b) add an optional override parameter to `StateCtl.new()` that calls `container.<capability>.override(providers.Object(...))` when supplied. This is the same pattern used for `file_system` and `process_runner` — it's how tests inject fakes through the engine-level entry point. Pure infra capabilities (e.g. clock used only by another module) don't need step (a)/(b) — only ones that flow into changers do.
+
 ### 5. Consume the capability
 
 - **In a module:** declare the dependency as a constructor parameter typed against the interface; the container injects it.
