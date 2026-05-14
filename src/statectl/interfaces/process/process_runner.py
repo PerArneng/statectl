@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Sequence
 
-from statectl.interfaces.process.process_result import ProcessResult
+
+@dataclass(frozen=True)
+class ProcessResult:
+    exit_code: int
+    stdout: str
+    stderr: str
+    duration_ms: int
 
 
 class ProcessRunner(ABC):

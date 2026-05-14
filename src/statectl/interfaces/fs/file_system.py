@@ -1,9 +1,16 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from pathlib import Path
 
-from statectl.interfaces.fs.file_entry import FileEntry
+
+@dataclass(frozen=True)
+class FileEntry:
+    path: Path
+    name: str
+    is_dir: bool
+    is_file: bool
 
 
 class FileSystem(ABC):

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import override
 
 from statectl.interfaces.fs import FileSystem, FsError, FsNotFound
-from statectl.modules.fs import RealFileSystem
+from statectl.modules import RealFileSystem
 from statectl.state_changer import (
     ExistingState,
     Parameters,

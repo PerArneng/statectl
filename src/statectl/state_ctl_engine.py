@@ -14,9 +14,7 @@ from statectl.engine_error import (
 from statectl.engine_result import EngineResult, NodeOutcome, NodeReport
 from statectl.execution_node import ExecutionNode
 from statectl.interfaces.logger import Logger
-from statectl.modules.fs import RealFileSystem
-from statectl.modules.logger import DefaultLogger
-from statectl.modules.process import RealProcessRunner
+from statectl.modules import DefaultLogger, RealFileSystem, RealProcessRunner
 from statectl.state_changer import (
     ExistingState,
     Result,

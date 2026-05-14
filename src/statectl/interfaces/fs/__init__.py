@@ -1,5 +1,4 @@
-from .file_entry import FileEntry as FileEntry
-from .file_system import FileSystem as FileSystem
+from .file_system import FileEntry as FileEntry, FileSystem as FileSystem
 from .fs_errors import (
     FsAlreadyExists as FsAlreadyExists,
     FsDecodeError as FsDecodeError,

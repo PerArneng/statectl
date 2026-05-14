@@ -13,7 +13,7 @@ from statectl import (
 )
 from statectl import NodeOutcome
 from statectl import ExecutionNode
-from statectl.modules.logger import DefaultLogger
+from statectl.modules import DefaultLogger
 from statectl import (
     ExistingState,
     Result,

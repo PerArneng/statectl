@@ -12,8 +12,7 @@ from statectl.interfaces.process import (
     ProcessRunner,
     ProcessTimeout,
 )
-from statectl.modules.fs import RealFileSystem
-from statectl.modules.process import RealProcessRunner
+from statectl.modules import RealFileSystem, RealProcessRunner
 from statectl.state_changer import (
     ExistingState,
     Parameters,

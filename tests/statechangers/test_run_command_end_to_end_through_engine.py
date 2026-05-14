@@ -4,7 +4,7 @@ from pathlib import Path
 
 from statectl import ExecutionNode
 from statectl.interfaces.process import ProcessResult
-from statectl.modules.logger import DefaultLogger
+from statectl.modules import DefaultLogger
 from statectl import StateCtlEngine
 from statectl.statechangers import (
     RunCommandParameters,

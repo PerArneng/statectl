@@ -17,8 +17,8 @@ Repo uses the **`src/` layout** — the importable package lives at `src/statect
 
 - `src/statectl/state_changer.py` — core ABCs + `Parameters`, `StateAssessment`, `ExistingState`, `Result`, `ResultStatus`.
 - `src/statectl/state_ctl_engine.py` — `StateCtlEngine` and its private DI container.
-- `src/statectl/interfaces/<capability>/` — ABCs for side-effecting capabilities (e.g. `fs/`, `logger.py`) plus the typed error hierarchy in `<capability>_errors.py` (e.g. `fs_errors.py`, `process_errors.py`).
-- `src/statectl/modules/<capability>/` — concrete implementations of those interfaces (e.g. `fs/real_file_system.py`).
+- `src/statectl/interfaces/<capability>/` — ABCs for side-effecting capabilities (e.g. `fs/`, `logger.py`) plus the typed error hierarchy in `<capability>_errors.py` (e.g. `fs_errors.py`, `process_errors.py`). Value objects tightly coupled to an ABC (e.g. `FileEntry`, `ProcessResult`) live in the same file as that ABC, not a separate file.
+- `src/statectl/modules/` — concrete implementations of those interfaces as flat files (e.g. `real_file_system.py`, `default_logger.py`, `real_process_runner.py`). No per-capability subpackages — each impl is a single file at the `modules/` root, re-exported via `modules/__init__.py`.
 - `src/statectl/statechangers/` — concrete `StateChanger` implementations.
 - `tests/fakes/` — in-memory / failing fakes used in tests.
 - `examples/` — PEP-723 uv scripts depending on the library via `tool.uv.sources = { path = "../", editable = true }`.
@@ -28,7 +28,7 @@ Repo uses the **`src/` layout** — the importable package lives at `src/statect
 - **No stdlib IO in state changers or modules.** Any filesystem/network/process/clock/env call goes behind an interface in `src/statectl/interfaces/` with a real impl in `src/statectl/modules/`. See the `new-capability` skill.
 - **Wiring split:** the DI `_Container` wires only engine-internal singletons (logger, engine). State changers are wired manually by the driver — they accept capabilities as constructor kwargs and default `None` to the real impl (e.g. `RealFileSystem()`) so trivial driver code stays terse. Tests inject fakes through the same kwargs. This means it's expected and intentional for `statechangers/*.py` to import from `src/statectl/modules/`.
 - **No real IO in tests.** Tests drive state changers through fakes (`tests/fakes/`). A test that touches the real disk, network, or process table is a bug.
-- **Top-level types live in their own file** (snake_case name; `RealFileSystem` → `real_file_system.py`). Tightly-coupled groups — error hierarchies, small value-object clusters — share one file named `<group>.py` (e.g. `fs_errors.py` holds `FsError` and all its variants). Small private helpers used only by one class may share that class's file.
+- **Top-level types live in their own file** (snake_case name; `RealFileSystem` → `real_file_system.py`), with two exceptions: (1) error hierarchies share one file named `<group>_errors.py` (e.g. `fs_errors.py` holds `FsError` and all its variants); (2) value objects tightly coupled to a single ABC share that ABC's file (e.g. `FileEntry` lives in `file_system.py`, `ProcessResult` in `process_runner.py`). Small private helpers used only by one class may share that class's file.
 - **`__init__.py` is the curated public surface of its package.** Each subpackage's `__init__.py` re-exports its classes with `__all__` using relative imports (`from .file_system import FileSystem as FileSystem`). Callers (tests, examples, cross-subpackage source) import from the package: `from statectl.interfaces.fs import FileSystem, FsNotFound`. Exception: top-level types (`StateChanger`, `Result`, `ExecutionNode`, `StateCtlEngine`, …) are imported from their file (`from statectl.state_changer import StateChanger`) inside source files under `src/statectl/` to avoid `src/statectl/__init__.py` circular-load issues. External code (tests, examples) imports them from `statectl` directly: `from statectl import StateChanger, ExecutionNode`.
 - Type hints on every signature and class attribute. `assess_state()` is read-only; side effects go in `transition()` / `rollback()`.
 - **`@override` on every method that overrides an ABC/parent method** (`from typing import override`). Pyrefly is configured with the **strict** preset and rejects unannotated overrides.
@@ -43,4 +43,4 @@ Read these only when relevant to the current task:
 - Reference implementations to read before writing similar code:
   - `src/statectl/statechangers/new_text_file.py` — rollbackable, single capability, content-equivalence idempotency.
   - `src/statectl/statechangers/run_command.py` — non-rollbackable, two capabilities, sentinel-based (`creates`/`removes`) idempotency.
-  - `src/statectl/interfaces/fs/` (ABC + `fs_errors.py` + `__init__.py` re-exports) + `src/statectl/modules/fs/real_file_system.py` — capability shape (interface + typed errors + real impl + `_translate()` context manager).
+  - `src/statectl/interfaces/fs/` (ABC + `fs_errors.py` + `__init__.py` re-exports) + `src/statectl/modules/real_file_system.py` — capability shape (interface + typed errors + real impl + `_translate()` context manager).
