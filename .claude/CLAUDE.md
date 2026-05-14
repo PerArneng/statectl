@@ -43,7 +43,7 @@ Repo uses the **`src/` layout** — the importable package lives at `src/statect
 
 ## Work tracking
 
-Work is driven by **GitHub Issues** on `PerArneng/statectl`, organized on a Project v2 Kanban board (`Todo` → `In Progress` → `Done`) at https://github.com/users/PerArneng/projects/1. The roadmap (`docs/roadmap.md`) is the source of truth for what to build; each item there has a matching issue with `tier-N` and `kind:*` labels. Before starting code, move the card to `In Progress` and link a branch; on merge, `Closes #N` in the PR moves it to `Done`. For the full workflow (URLs, GraphQL mutations, branch naming) → invoke the `github-task-workflow` skill.
+Work is driven by **GitHub Issues** on `PerArneng/statectl`, organized on a Project v2 Kanban board (`Todo` → `In Progress` → `Done`) at https://github.com/users/PerArneng/projects/1. The roadmap (`docs/roadmap.md`) is the source of truth for what to build; each item there has a matching issue with `tier-N` and `kind:*` labels. Before starting code, move the card to `In Progress` and link a branch; on merge, `Closes #N` in the PR moves it to `Done`. **Every commit must reference its issue number** (e.g. `Add FileSystem.chmod (#1)`) so commits show up on the issue timeline. For the full workflow (URLs, GraphQL mutations, branch naming) → invoke the `github-task-workflow` skill.
 
 ## Task-specific guides
 
