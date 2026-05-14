@@ -180,6 +180,8 @@ def assess_state(self) -> StateAssessment:
 
 `assess_state` must not mutate anything. If you need a probe that has side effects, that's a code smell — find a read-only check or push the side effect into `transition()`.
 
+**Only check preconditions on branches `transition` will actually exercise.** If a precondition is only relevant when the changer needs to take a specific action, gate the check on that action being needed. Example: `EnsureDirectory` only needs the parent directory writable when it has to *create* the target; if the target already exists and the changer is just adjusting mode (or is ALREADY_APPLIED), parent writability is irrelevant and reporting it as an INVALID issue is a false positive. The pattern: compute `path_exists`/`path_state` first, then `if not path_exists: check_parent_writability()`. Over-checking yields confusing diagnostics for cases that would actually succeed.
+
 ### `transition() -> Result`
 Where the side effect lives. Return:
 
@@ -264,7 +266,7 @@ A state changer ships with its test suite. The reference is `tests/statechangers
 - `test_<name>_transition_success.py` — happy path, including that `details` carry the expected fields and that capability fakes recorded exactly the expected calls
 - `test_<name>_transition_<failure-mode>.py` — one file per failure axis (e.g. unexpected exit, error matrix)
 - `test_<name>_transition_error_matrix.py` — parametrize over every typed-error subclass the capability raises; assert each maps to a specific failure `code`; include a negative test that a non-typed exception (`RuntimeError`) propagates
-- `test_<name>_end_to_end_through_engine.py` — integration: queue the changer in a real `StateCtl` with fakes injected; assert engine behavior (skip on ALREADY_APPLIED, halt on FAILURE, halt on INVALID)
+- `test_<name>_end_to_end_through_engine.py` — integration: queue the changer in a real `StateCtl` with fakes injected; assert engine behavior (skip on ALREADY_APPLIED, halt on FAILURE, halt on INVALID). The engine reports outcomes via `NodeOutcome` — the members are **`SUCCESS`, `SKIPPED_ALREADY_APPLIED`, `SKIPPED_BY_TRANSITION`, `FAILED_INVALID`, `FAILED_TRANSITION`, `BLOCKED`** (not the natural-guess names `SKIPPED` / `INVALID`). Match those exactly.
 
 Tests must use only fakes — no real disk, no real subprocess, no real network. If a fake doesn't exist for a capability you need, see the `new-capability` skill.
 

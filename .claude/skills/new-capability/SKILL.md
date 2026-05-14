@@ -29,6 +29,8 @@ Small value types tightly coupled to this ABC (e.g. `FileEntry` for `FileSystem`
 - **Query methods never raise.** They return `bool`, `Optional[T]`, or a value type. Examples: `FileSystem.exists`, `FileSystem.is_dir`, `ProcessRunner.which`. State changers' `assess_state()` calls only query methods.
 - **Action methods raise typed errors on failure** that the capability cannot meaningfully express as a return value (the executable can't be found, the connection refused, the bytes can't be decoded). Examples: `FileSystem.read_text_file`, `ProcessRunner.run`.
 
+**Pair raising methods with non-raising probes when assess needs them.** If a state changer's `assess_state` needs to inspect something that the capability currently only exposes via a raising action method (e.g. `FileSystem.list_files` raises, but assess needs to know "is this directory empty?"), add a non-raising sibling (`is_empty_dir(path) -> bool`) rather than letting assess catch exceptions. The non-raiser collapses every error path to a single sensible default (`False` / `None`) so callers stay branch-free. This came up adding `EnsureDirectory`: rollback assess needed an emptiness probe, so `is_empty_dir` (returns `False` on any error) was added alongside the existing raising `list_files`.
+
 Don't conflate "failure" with "non-success result." A 4xx HTTP response or a non-zero process exit is a *returned status* the caller owns policy over, not an exception. `RealProcessRunner.run` returns a `ProcessResult` with `exit_code=1` — it does **not** raise. Only launch-level problems (no such executable, timeout, OS-level launch failure) raise.
 
 ### 2. Define typed errors
@@ -69,6 +71,8 @@ A new capability ships with **two** test fakes, not one. The pair pattern from `
 - **Thin failure-injector wrapper** — wraps *any* implementation of the interface and lets tests register one-shot exceptions via `.fail(method, error)`. Examples: `FailingFileSystem`, `FailingProcessRunner`.
 
 The canonical test setup composes them: `FailingFs(InMemoryFs(...))` / `FailingPr(ScriptedPr(...))`. This gives the rich state-driven base plus surgical error injection without each test having to build its own broken impl.
+
+**When you add a method to an existing capability, update both fakes in the same change.** The failure-injector wrapper inherits from the ABC and will become abstract-incomplete the moment you add an ABC method without adding a passthrough — but pyrefly may not flag this until something actually instantiates it. The in-memory fake needs real behavior; the wrapper needs a one-line passthrough (plus a `self._maybe_fail(...)` call for action methods). Easy to forget — the test suite for the original capability won't exercise the new method.
 
 ## Checklist
 
