@@ -26,6 +26,8 @@ class NodeReport:
     outcome: NodeOutcome
     assessment: StateAssessment | None
     result: Result | None
+    post_assess: StateAssessment | None = None
+    rollback_result: Result | None = None
 
 
 @dataclass(frozen=True)
