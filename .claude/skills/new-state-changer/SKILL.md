@@ -45,7 +45,7 @@ from statectl.interfaces.fs import FileSystem, FsError, FsNotFound  # capability
 from statectl.modules.fs import RealFileSystem                       # default for `None` capability kwarg
 ```
 
-Top-level types (`StateChanger`, `Parameters`, …) come from `statectl.state_changer` (file path) rather than `statectl` (package surface) — inside `statectl/` source files this avoids circular load against the partially-initialized `src/statectl/__init__.py`. Capability ABCs, errors, and real impls always come from their package surface (`statectl.interfaces.<cap>`, `statectl.modules.<cap>`).
+Top-level types (`StateChanger`, `Parameters`, …) come from `statectl.state_changer` (file path) rather than `statectl` (package surface) — inside `src/statectl/` source files this avoids circular load against the partially-initialized `src/statectl/__init__.py`. Capability ABCs, errors, and real impls always come from their package surface (`statectl.interfaces.<cap>`, `statectl.modules.<cap>`).
 
 `@override` is required on every overriding method (`name`, `assess_state`, `transition`, `rollback`) under the project's strict pyrefly preset.
 
