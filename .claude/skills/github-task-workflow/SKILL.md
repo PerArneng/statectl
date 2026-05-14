@@ -40,6 +40,12 @@ Prefer running these over reproducing their GraphQL inline. If something fails, 
 - **Capabilities only**: `https://github.com/PerArneng/statectl/issues?q=is%3Aissue+label%3Akind%3Acapability+sort%3Acreated-asc`
 - **Single issue**: `https://github.com/PerArneng/statectl/issues/<N>`
 
+## Triggers — when to move cards without being asked again
+
+- **"implement issue #N" / "solve #N" / "work on #N" / "let's do #N"** → immediately run `scripts/set-status.sh <N> in-progress` (and assign `@me`) **before** any other tool calls for the task, including planning. Do this even in plan mode — moving a card is not a code edit. Mention it in one line so the user sees the board was updated.
+- **"mark #N done" / "close #N" / "this is done" (referring to an in-flight issue)** → run `scripts/set-status.sh <N> done`. Normally `Closes #N` in a merged PR auto-moves the card; use the explicit command when the user signals completion out-of-band (abandoned work, merged without the magic line, manual close).
+- **"what's next" / "pick the next task"** → see step 1 below; do *not* auto-claim. Wait for the user to confirm the pick before moving to In Progress.
+
 ## The end-to-end workflow
 
 The board reflects what's actually in flight. The card moves *before* the code does — that's what makes "what's everyone working on?" answerable at a glance.

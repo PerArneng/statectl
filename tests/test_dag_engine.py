@@ -60,6 +60,7 @@ class _ProgrammableChanger(StateChanger):
             with self._span_lock:
                 self._record_span.append((self._name, start, end))
         if self._succeed:
+            self._state = ExistingState.ALREADY_APPLIED
             return Result.success(message=self._name)
         return Result.failure(code="ERR", message=f"{self._name} failed")
 

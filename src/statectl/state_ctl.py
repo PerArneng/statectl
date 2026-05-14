@@ -22,6 +22,7 @@ from statectl._state_changer import (
     ExistingState,
     Result,
     ResultStatus,
+    RollbackableStateChanger,
     StateAssessment,
     StateChanger,
 )
@@ -77,8 +78,7 @@ class StateCtl:
         )
 
         outcomes: dict[ExecutionNode, NodeOutcome] = {}
-        assessments: dict[ExecutionNode, StateAssessment] = {}
-        results: dict[ExecutionNode, Result] = {}
+        node_reports: dict[ExecutionNode, NodeReport] = {}
         remaining: dict[ExecutionNode, int] = dict(in_degree)
 
         def mark_blocked(start_node: ExecutionNode) -> None:
@@ -88,6 +88,12 @@ class StateCtl:
                 if d in outcomes:
                     continue
                 outcomes[d] = NodeOutcome.BLOCKED
+                node_reports[d] = NodeReport(
+                    node_name=d.name(),
+                    outcome=NodeOutcome.BLOCKED,
+                    assessment=None,
+                    result=None,
+                )
                 self._logger.warning(
                     "[%s] blocked: upstream %s failed",
                     d.name(),
@@ -113,10 +119,7 @@ class StateCtl:
                     node = in_flight.pop(fut)
                     report = fut.result()
                     outcomes[node] = report.outcome
-                    if report.assessment is not None:
-                        assessments[node] = report.assessment
-                    if report.result is not None:
-                        results[node] = report.result
+                    node_reports[node] = report
 
                     if report.outcome in {
                         NodeOutcome.FAILED_INVALID,
@@ -132,18 +135,20 @@ class StateCtl:
                         if remaining[d] == 0:
                             submit(d)
 
-        reports: list[NodeReport] = []
-        for n in self._nodes:
-            reports.append(
+        reports: tuple[NodeReport, ...] = tuple(
+            node_reports.get(
+                n,
                 NodeReport(
                     node_name=n.name(),
-                    outcome=outcomes.get(n, NodeOutcome.BLOCKED),
-                    assessment=assessments.get(n),
-                    result=results.get(n),
-                )
+                    outcome=NodeOutcome.BLOCKED,
+                    assessment=None,
+                    result=None,
+                ),
             )
+            for n in self._nodes
+        )
 
-        engine_result = EngineResult(reports=tuple(reports))
+        engine_result = EngineResult(reports=reports)
         self._logger.info(
             "StateCtl finished: ok=%s (%d node(s))",
             engine_result.ok,
@@ -177,29 +182,98 @@ class StateCtl:
                 result=None,
             )
 
-        result = changer.transition()
+        return self._finalise_node(name, changer, assessment)
+
+    def _finalise_node(
+        self,
+        name: str,
+        changer: StateChanger,
+        assessment: StateAssessment,
+    ) -> NodeReport:
+        result: Result = changer.transition()
+        post_assess: StateAssessment | None = None
+
+        if result.status is ResultStatus.SKIPPED:
+            self._logger.info(
+                "[%s] transition skipped: %s", name, result.message or result.code
+            )
+            return NodeReport(
+                node_name=name,
+                outcome=NodeOutcome.SKIPPED_BY_TRANSITION,
+                assessment=assessment,
+                result=result,
+            )
+
         if result.status is ResultStatus.SUCCESS:
             self._logger.info(
                 "[%s] transition: %s", name, result.message or result.code
             )
-            outcome = NodeOutcome.SUCCESS
-        elif result.status is ResultStatus.SKIPPED:
+            post_assess = changer.assess_state()
             self._logger.info(
-                "[%s] transition skipped: %s", name, result.message or result.code
+                "[%s] post-assess: %s (%s)",
+                name,
+                post_assess.state.value,
+                post_assess.description,
             )
-            outcome = NodeOutcome.SKIPPED_BY_TRANSITION
+            if post_assess.state is ExistingState.ALREADY_APPLIED:
+                return NodeReport(
+                    node_name=name,
+                    outcome=NodeOutcome.SUCCESS,
+                    assessment=assessment,
+                    result=result,
+                    post_assess=post_assess,
+                )
+            self._logger.error(
+                "[%s] post-assess mismatch: expected ALREADY_APPLIED, got %s",
+                name,
+                post_assess.state.value,
+            )
+            result = Result.failure(
+                code="POST_ASSESS_MISMATCH",
+                message=(
+                    f"transition reported SUCCESS but post-assess returned "
+                    f"{post_assess.state.value}: {post_assess.description}"
+                ),
+            )
+            outcome: NodeOutcome = NodeOutcome.FAILED_TRANSITION
         else:
             self._logger.error(
                 "[%s] transition failed: %s %s", name, result.code, result.message
             )
             outcome = NodeOutcome.FAILED_TRANSITION
 
+        rollback_result: Result | None = self._maybe_rollback(name, changer)
         return NodeReport(
             node_name=name,
             outcome=outcome,
             assessment=assessment,
             result=result,
+            post_assess=post_assess,
+            rollback_result=rollback_result,
         )
+
+    def _maybe_rollback(
+        self,
+        name: str,
+        changer: StateChanger,
+    ) -> Result | None:
+        if not isinstance(changer, RollbackableStateChanger):
+            return None
+        self._logger.info("[%s] rollback: starting", name)
+        inverse: StateChanger = changer.rollback()
+        rb_result: Result = inverse.transition()
+        if rb_result.status is ResultStatus.SUCCESS:
+            self._logger.info(
+                "[%s] rollback: %s", name, rb_result.message or rb_result.code
+            )
+        else:
+            self._logger.error(
+                "[%s] rollback failed: %s %s",
+                name,
+                rb_result.code,
+                rb_result.message,
+            )
+        return rb_result
 
     @staticmethod
     def new(
