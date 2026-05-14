@@ -54,14 +54,17 @@ Three layers, with dependencies flowing strictly downward:
 
 - The **DI container** (`_Container` at the bottom of `state_ctl_engine.py`) wires only **engine-internal** singletons: the logger and the engine itself. It also declares `filesystem` and `process_runner` providers, but those exist as a convenience — the engine doesn't inject them into state changers.
 - **State changers are wired manually by the driver.** Each changer accepts its capabilities as constructor kwargs and defaults `None` to the real impl (e.g. `self._fs: FileSystem = file_system or RealFileSystem()`). This keeps driver code terse — `NewTextFileStateChanger(params)` just works — while tests inject fakes through the same kwargs.
-- **Consequence:** it is *expected and intentional* that `statechangers/*.py` imports concrete classes from `statectl/modules/` for those defaults. The package-level dependency graph will show `statechangers/ → modules/` edges; these are not a layering violation, they are the ergonomic seam.
+- **Consequence:** it is *expected and intentional* that `statechangers/*.py` imports concrete classes from `src/statectl/modules/` for those defaults. The package-level dependency graph will show `statechangers/ → modules/` edges; these are not a layering violation, they are the ergonomic seam.
 
 If you ever need a capability to be a true singleton shared across changers (e.g. a connection pool, a clock with a fixed epoch), promote it: have the driver construct it once and pass it into each changer explicitly. Don't add it to `_Container` and don't reach into the container from a changer.
 
 ## Folder layout
 
+Repo uses the PyPA-recommended **`src/` layout** — the importable package lives at `src/statectl/`, not at the repo root. This prevents accidental imports of the working-tree copy when running from the repo root and forces tests/examples to use the installed package via `uv sync` / `pip install -e .`.
+
 ```
-statectl/
+src/statectl/
+├── py.typed                    # marks the package as typed (PEP 561)
 ├── state_changer.py            # core ABCs + value types (StateChanger, Parameters, Result, …)
 ├── execution_node.py           # ExecutionNode (graph node wrapping one changer)
 ├── state_ctl_engine.py         # StateCtlEngine + private _Container
@@ -111,7 +114,7 @@ Why this split: state changers shouldn't know whether they're running against th
 
 ## Core abstractions
 
-### `StateChanger` (`statectl/state_changer.py`)
+### `StateChanger` (`src/statectl/state_changer.py`)
 
 A directional, idempotent unit of work:
 
@@ -150,7 +153,7 @@ Every changer is constructed with a frozen `Parameters` subclass holding its inp
 1. **Equality semantics.** Changers can be compared and deduplicated by their params.
 2. **No surprises mid-run.** A changer that mutated its params during `transition()` would make `assess_state()` non-deterministic.
 
-### `ExecutionNode` (`statectl/execution_node.py`)
+### `ExecutionNode` (`src/statectl/execution_node.py`)
 
 A node in the engine's execution DAG. Wraps exactly one `StateChanger` and holds upstream node references. Identity is the node object itself — *not* the wrapped changer's name. (You could legitimately have two nodes wrapping different instances of the same changer type with different parameters.)
 
@@ -162,7 +165,7 @@ node_c = ExecutionNode(changer_c).depends_on(node_a, node_b)
 
 Important: the changer is the unit of work, the node is the unit of *graph membership*. Keeping them separate means changers stay pure (no graph state on them) and the same changer instance could in principle appear in multiple nodes — though deliberate, not accidental.
 
-### `StateCtlEngine` (`statectl/state_ctl_engine.py`)
+### `StateCtlEngine` (`src/statectl/state_ctl_engine.py`)
 
 Orchestrator. Two-phase execution:
 
@@ -198,9 +201,9 @@ Drivers introspect `EngineResult.reports` (a tuple preserving insertion order). 
 
 Anything that touches the outside world (filesystem, network, processes, clock, env, randomness) goes through a capability:
 
-1. **Interface** in `statectl/interfaces/<capability>/<capability>.py` — pure ABC, type hints, no IO.
-2. **Typed errors** in `statectl/interfaces/<capability>/<capability>_errors.py` — a single file containing the base error (`FsError`, `ProcessError`) and every variant (`FsNotFound`, `FsPermissionDenied`, …). Re-export them all from the capability's `__init__.py`.
-3. **Real impl** in `statectl/modules/<capability>/real_<capability>.py` — the *only* legal location for stdlib calls related to that capability. Typically uses a `_translate()` context manager that converts stdlib exceptions to typed interface errors.
+1. **Interface** in `src/statectl/interfaces/<capability>/<capability>.py` — pure ABC, type hints, no IO.
+2. **Typed errors** in `src/statectl/interfaces/<capability>/<capability>_errors.py` — a single file containing the base error (`FsError`, `ProcessError`) and every variant (`FsNotFound`, `FsPermissionDenied`, …). Re-export them all from the capability's `__init__.py`.
+3. **Real impl** in `src/statectl/modules/<capability>/real_<capability>.py` — the *only* legal location for stdlib calls related to that capability. Typically uses a `_translate()` context manager that converts stdlib exceptions to typed interface errors.
 4. **DI wiring** in `_Container` at the bottom of `state_ctl_engine.py` — `providers.Singleton(RealFileSystem)`, etc.
 5. **Test fake** in `tests/fakes/` — in-memory implementation honoring the same interface.
 
@@ -210,7 +213,7 @@ The capability error hierarchy is what lets changers `try/except` precisely (e.g
 
 These rules are non-negotiable because they preserve the layering above. Pyrefly enforces some of them at the type level; reviewers enforce the rest.
 
-1. **No stdlib IO in state changers — only inside `statectl/modules/<capability>/`.** Any `os`, `pathlib`, `subprocess`, `socket`, `requests`, `time`, `datetime.now()`, `random`, `os.environ` call belongs behind an interface. If you reach for stdlib IO outside `modules/`, that's a missing capability.
+1. **No stdlib IO in state changers — only inside `src/statectl/modules/<capability>/`.** Any `os`, `pathlib`, `subprocess`, `socket`, `requests`, `time`, `datetime.now()`, `random`, `os.environ` call belongs behind an interface. If you reach for stdlib IO outside `modules/`, that's a missing capability.
    - **Note on imports:** a state changer is allowed (and expected) to `import` a real impl from `modules/` *for the sole purpose* of defaulting a `None` capability kwarg. It must not call stdlib directly.
 2. **No real IO in tests.** Tests drive changers through fakes. A test that touches the real disk, network, or process table is a bug — it'll be flaky, slow, and environment-dependent.
 3. **Top-level types live in their own file**, filename = snake_case of the class (`RealFileSystem` → `real_file_system.py`). Tightly-coupled groups — error hierarchies, small value-object clusters used together — share one file named `<group>.py` (e.g. `fs_errors.py` holds `FsError` plus every variant). Small private helpers / sibling value types used only by one class may share that class's file (e.g. `RecordedCall` next to `ScriptedProcessRunner`).
@@ -222,7 +225,7 @@ These rules are non-negotiable because they preserve the layering above. Pyrefly
    from .fs_errors import FsError as FsError, FsNotFound as FsNotFound, ...
    __all__ = ["FileSystem", "FileEntry", "FsError", "FsNotFound", ...]
    ```
-   Callers (tests, examples, cross-subpackage source) import from the package surface: `from statectl.interfaces.fs import FileSystem, FsNotFound`. **Exception:** inside source files under `statectl/`, top-level types are imported from their file (`from statectl.state_changer import StateChanger`) — not via `from statectl import ...` — to avoid circular-load issues with the partially-initialized `statectl/__init__.py`. Same for siblings inside the same subpackage that need each other during their own class definition (`file_system.py` imports `FileEntry` from `statectl.interfaces.fs.file_entry`, not from `statectl.interfaces.fs`). External code (tests, examples) does `from statectl import StateChanger, ExecutionNode`.
+   Callers (tests, examples, cross-subpackage source) import from the package surface: `from statectl.interfaces.fs import FileSystem, FsNotFound`. **Exception:** inside source files under `statectl/`, top-level types are imported from their file (`from statectl.state_changer import StateChanger`) — not via `from statectl import ...` — to avoid circular-load issues with the partially-initialized `src/statectl/__init__.py`. Same for siblings inside the same subpackage that need each other during their own class definition (`file_system.py` imports `FileEntry` from `statectl.interfaces.fs.file_entry`, not from `statectl.interfaces.fs`). External code (tests, examples) does `from statectl import StateChanger, ExecutionNode`.
 5. **Type hints on every signature and class attribute.** No bare `def foo(x):`. No untyped `self._x = None` either — annotate the attribute.
 6. **`@override` on every method that overrides an ABC or parent method** (`from typing import override`). Pyrefly is configured strict and rejects unannotated overrides. This catches typos in method names (`asses_state` vs `assess_state`) before runtime.
 7. **`assess_state()` is read-only.** Side effects belong in `transition()` / `rollback()`. Violating this breaks idempotency.
@@ -247,9 +250,9 @@ Two layers of tests, both fully in-process:
 
 When writing similar code, read the closest existing reference first:
 
-- `statectl/statechangers/new_text_file.py` — rollbackable, single capability (FileSystem), content-equivalence idempotency (compares actual file content to desired text).
-- `statectl/statechangers/run_command.py` — non-rollbackable, two capabilities (FileSystem + ProcessRunner), sentinel-based idempotency via `creates` / `removes` paths. Demonstrates the multi-capability pattern.
-- `statectl/interfaces/fs/` (ABC in `file_system.py`, errors in `fs_errors.py`, public surface in `__init__.py`) + `statectl/modules/fs/real_file_system.py` — the full capability shape: ABC, typed error hierarchy, real impl, `_translate()` context manager that maps stdlib exceptions to typed interface errors.
+- `src/statectl/statechangers/new_text_file.py` — rollbackable, single capability (FileSystem), content-equivalence idempotency (compares actual file content to desired text).
+- `src/statectl/statechangers/run_command.py` — non-rollbackable, two capabilities (FileSystem + ProcessRunner), sentinel-based idempotency via `creates` / `removes` paths. Demonstrates the multi-capability pattern.
+- `src/statectl/interfaces/fs/` (ABC in `file_system.py`, errors in `fs_errors.py`, public surface in `__init__.py`) + `src/statectl/modules/fs/real_file_system.py` — the full capability shape: ABC, typed error hierarchy, real impl, `_translate()` context manager that maps stdlib exceptions to typed interface errors.
 
 ## Task-specific guides
 

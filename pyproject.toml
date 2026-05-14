@@ -17,13 +17,13 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["statectl"]
+packages = ["src/statectl"]
 
 [tool.pyrefly]
 preset = "strict"
 project-includes = [
-    "statectl/**/*.py",
-    "statectl/**/*.ipynb",
+    "src/statectl/**/*.py",
+    "src/statectl/**/*.ipynb",
 ]
 
 [dependency-groups]
