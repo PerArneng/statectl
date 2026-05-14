@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from statectl import StateCtl
-from statectl.interfaces.process import ProcessResult
-from statectl.statechangers import (
+from statectl._interfaces.process import ProcessResult
+from statectl._statechangers import (
     NewTextFileRollbackStateChanger,
     NewTextFileStateChanger,
     RunCommandStateChanger,

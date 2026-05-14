@@ -1,7 +1,7 @@
 import logging
 from typing import Any, override
 
-from statectl.interfaces.logger import Logger
+from statectl._interfaces.logger import Logger
 
 
 class DefaultLogger(Logger):

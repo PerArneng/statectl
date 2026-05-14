@@ -6,21 +6,17 @@ from typing import override
 
 import pytest
 
-from statectl import (
-    DuplicateNodeError,
-    UnknownDependencyError,
-)
-from statectl import NodeOutcome
-from statectl.modules import DefaultLogger
-from tests.fakes.in_memory_file_system import InMemoryFileSystem
-from tests.fakes.scripted_process_runner import ScriptedProcessRunner
-from statectl import (
+from statectl import NodeOutcome, StateCtl
+from statectl._engine_error import DuplicateNodeError, UnknownDependencyError
+from statectl._modules import DefaultLogger
+from statectl._state_changer import (
     ExistingState,
     Result,
     StateAssessment,
     StateChanger,
 )
-from statectl import StateCtl
+from tests.fakes.in_memory_file_system import InMemoryFileSystem
+from tests.fakes.scripted_process_runner import ScriptedProcessRunner
 
 
 class _ProgrammableChanger(StateChanger):

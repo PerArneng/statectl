@@ -8,10 +8,10 @@ description: How to add a new side-effecting capability (filesystem, network, HT
 A capability is any side-effecting concern (filesystem, network, HTTP, process exec, clock, env, …). State changers and modules must never call stdlib IO directly — every such concern is wrapped behind an ABC and injected.
 
 The reference example is the filesystem capability:
-- Interface + value object: `src/statectl/interfaces/fs/file_system.py` (`FileSystem` ABC and the tightly-coupled `FileEntry` value object live in the same file)
-- Typed errors: `src/statectl/interfaces/fs/fs_errors.py` (`FsError` base + all variants in one file)
-- Public surface: `src/statectl/interfaces/fs/__init__.py` (re-exports the ABC, value types, and every error with `__all__`)
-- Real implementation: `src/statectl/modules/real_file_system.py` (`RealFileSystem`), re-exported from `src/statectl/modules/__init__.py` (flat — modules do not have per-capability subpackages)
+- Interface + value object: `src/statectl/_interfaces/fs/file_system.py` (`FileSystem` ABC and the tightly-coupled `FileEntry` value object live in the same file)
+- Typed errors: `src/statectl/_interfaces/fs/fs_errors.py` (`FsError` base + all variants in one file)
+- Public surface: `src/statectl/_interfaces/fs/__init__.py` (re-exports the ABC, value types, and every error with `__all__`)
+- Real implementation: `src/statectl/_modules/real_file_system.py` (`RealFileSystem`), re-exported from `src/statectl/_modules/__init__.py` (flat — modules do not have per-capability subpackages)
 - DI registration: `src/statectl/state_ctl.py` `_Container.filesystem = providers.Singleton(RealFileSystem)`
 
 Read those files before adding a new capability — mirror their shape.
@@ -20,7 +20,7 @@ Read those files before adding a new capability — mirror their shape.
 
 ### 1. Define the interface
 
-Create `src/statectl/interfaces/<capability>/<capability>.py` with an ABC. Methods describe the capability in domain terms (not stdlib terms — `which` / `run`, not `subprocess_run`). Type-hint every signature.
+Create `src/statectl/_interfaces/<capability>/<capability>.py` with an ABC. Methods describe the capability in domain terms (not stdlib terms — `which` / `run`, not `subprocess_run`). Type-hint every signature.
 
 Small value types tightly coupled to this ABC (e.g. `FileEntry` for `FileSystem`, `ProcessResult` for `ProcessRunner`) live **in the same file as the ABC**, not in separate files. Re-export them alongside the interface from the capability's `__init__.py`.
 
@@ -33,13 +33,13 @@ Don't conflate "failure" with "non-success result." A 4xx HTTP response or a non
 
 ### 2. Define typed errors
 
-Create `src/statectl/interfaces/<capability>/<capability>_errors.py` with the base exception class **and every variant in the same file** — e.g. `FsError` plus `FsNotFound`, `FsPermissionDenied`, `FsAlreadyExists`, …; or `ProcessError` plus `ProcessNotFound`, `ProcessTimeout`, …. Callers catch the base; the variants carry detail. Re-export every class from the capability's `__init__.py`.
+Create `src/statectl/_interfaces/<capability>/<capability>_errors.py` with the base exception class **and every variant in the same file** — e.g. `FsError` plus `FsNotFound`, `FsPermissionDenied`, `FsAlreadyExists`, …; or `ProcessError` plus `ProcessNotFound`, `ProcessTimeout`, …. Callers catch the base; the variants carry detail. Re-export every class from the capability's `__init__.py`.
 
 The real implementation is responsible for translating stdlib exceptions into these typed errors so callers never see `OSError`/`FileNotFoundError`/`subprocess.TimeoutExpired`/etc.
 
 ### 3. Implement the real module
 
-Create `src/statectl/modules/real_<capability>.py` (flat — no per-capability subpackage) with the concrete class, and add a re-export to `src/statectl/modules/__init__.py` (`from .real_<capability> import Real<Capability> as Real<Capability>` + extend `__all__`). It may import only from `statectl.interfaces.*` — never from another concrete module. If it needs another capability, take it as a constructor parameter typed against that interface.
+Create `src/statectl/_modules/real_<capability>.py` (flat — no per-capability subpackage) with the concrete class, and add a re-export to `src/statectl/_modules/__init__.py` (`from .real_<capability> import Real<Capability> as Real<Capability>` + extend `__all__`). It may import only from `statectl._interfaces.*` — never from another concrete module. If it needs another capability, take it as a constructor parameter typed against that interface.
 
 Every method that implements an interface method needs `@override` (`from typing import override`) — strict pyrefly enforces it.
 
@@ -72,12 +72,12 @@ The canonical test setup composes them: `FailingFs(InMemoryFs(...))` / `FailingP
 
 ## Checklist
 
-- [ ] Interface ABC under `src/statectl/interfaces/<capability>/`, methods in domain terms, query vs action split
+- [ ] Interface ABC under `src/statectl/_interfaces/<capability>/`, methods in domain terms, query vs action split
 - [ ] Tightly-coupled value types (`FileEntry`, `ProcessResult`-style) live in the **same file** as the ABC
-- [ ] Typed error hierarchy in one file: `src/statectl/interfaces/<capability>/<capability>_errors.py` (base + all variants)
-- [ ] `src/statectl/interfaces/<capability>/__init__.py` re-exports the ABC, value types, and every error with `__all__` (relative imports)
-- [ ] Real implementation at `src/statectl/modules/real_<capability>.py` (flat, no subpackage) translating stdlib exceptions to typed errors via a `_translate()` context manager (see `RealFileSystem`)
-- [ ] `src/statectl/modules/__init__.py` extended to re-export the new real impl in `__all__`
+- [ ] Typed error hierarchy in one file: `src/statectl/_interfaces/<capability>/<capability>_errors.py` (base + all variants)
+- [ ] `src/statectl/_interfaces/<capability>/__init__.py` re-exports the ABC, value types, and every error with `__all__` (relative imports)
+- [ ] Real implementation at `src/statectl/_modules/real_<capability>.py` (flat, no subpackage) translating stdlib exceptions to typed errors via a `_translate()` context manager (see `RealFileSystem`)
+- [ ] `src/statectl/_modules/__init__.py` extended to re-export the new real impl in `__all__`
 - [ ] `@override` on every overriding method in the real implementation
 - [ ] `providers.Singleton(...)` entry in `_Container`
 - [ ] Two fakes under `tests/fakes/` — rich in-memory/scripted + thin failure-injector wrapper

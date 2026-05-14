@@ -4,13 +4,13 @@ import shlex
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
-from statectl.interfaces.fs import FileSystem
-from statectl.interfaces.process import ProcessRunner
-from statectl.statechangers.new_text_file import (
+from statectl._interfaces.fs import FileSystem
+from statectl._interfaces.process import ProcessRunner
+from statectl._statechangers.new_text_file import (
     NewTextFileParameters,
     NewTextFileStateChanger,
 )
-from statectl.statechangers.run_command import (
+from statectl._statechangers.run_command import (
     RunCommandParameters,
     RunCommandStateChanger,
 )

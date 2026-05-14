@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from statectl.interfaces.process import ProcessResult
-from statectl.modules import DefaultLogger
+from statectl._interfaces.process import ProcessResult
+from statectl._modules import DefaultLogger
 from statectl import StateCtl
-from statectl.statechangers import (
+from statectl._statechangers import (
     RunCommandParameters,
     RunCommandStateChanger,
 )

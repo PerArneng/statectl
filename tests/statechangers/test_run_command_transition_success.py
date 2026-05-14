@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from statectl.interfaces.process import ProcessResult
-from statectl import ResultStatus
-from statectl.statechangers import (
+from statectl._interfaces.process import ProcessResult
+from statectl._state_changer import ResultStatus
+from statectl._statechangers import (
     RunCommandParameters,
     RunCommandStateChanger,
 )

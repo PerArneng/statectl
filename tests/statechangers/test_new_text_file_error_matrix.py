@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from statectl.interfaces.fs import (
+from statectl._interfaces.fs import (
     FsAlreadyExists,
     FsDecodeError,
     FsError,
@@ -14,8 +14,8 @@ from statectl.interfaces.fs import (
     FsNotFound,
     FsPermissionDenied,
 )
-from statectl import ExistingState, ResultStatus, RollbackableStateChanger
-from statectl.statechangers import (
+from statectl._state_changer import ExistingState, ResultStatus, RollbackableStateChanger
+from statectl._statechangers import (
     NewTextFileParameters,
     NewTextFileStateChanger,
 )

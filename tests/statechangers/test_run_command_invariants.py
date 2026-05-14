@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from statectl import RollbackableStateChanger, StateChanger
-from statectl.statechangers import (
+from statectl._state_changer import RollbackableStateChanger, StateChanger
+from statectl._statechangers import (
     RunCommandParameters,
     RunCommandStateChanger,
 )

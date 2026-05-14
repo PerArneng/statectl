@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping, Sequence, override
 
-from statectl.interfaces.process import (
+from statectl._interfaces.process import (
     ProcessNotFound,
     ProcessResult,
     ProcessRunner,

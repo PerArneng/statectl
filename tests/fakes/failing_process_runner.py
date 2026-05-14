@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Mapping, Sequence, override
 
-from statectl.interfaces.process import (
+from statectl._interfaces.process import (
     ProcessResult,
     ProcessRunner,
 )

@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator, override
 
-from statectl.interfaces.fs import (
+from statectl._interfaces.fs import (
     FileEntry,
     FileSystem,
     FsAlreadyExists,

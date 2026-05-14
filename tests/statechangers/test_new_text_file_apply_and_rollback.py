@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from statectl import ExistingState, ResultStatus, RollbackableStateChanger
-from statectl.statechangers import (
+from statectl._state_changer import ExistingState, ResultStatus, RollbackableStateChanger
+from statectl._statechangers import (
     NewTextFileParameters,
     NewTextFileStateChanger,
 )

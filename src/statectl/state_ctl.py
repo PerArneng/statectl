@@ -7,18 +7,18 @@ from typing import Sequence
 
 from dependency_injector import containers, providers
 
-from statectl.engine_error import (
+from statectl._engine_error import (
     DuplicateNodeError,
     UnknownDependencyError,
 )
-from statectl.engine_result import EngineResult, NodeOutcome, NodeReport
-from statectl.execution_node import ExecutionNode
-from statectl.interfaces.fs import FileSystem
-from statectl.interfaces.logger import Logger
-from statectl.interfaces.process import ProcessRunner
-from statectl.modules import DefaultLogger, RealFileSystem, RealProcessRunner
-from statectl.statechangers.state_changers import StateChangers
-from statectl.state_changer import (
+from statectl._engine_result import EngineResult, NodeOutcome, NodeReport
+from statectl._execution_node import ExecutionNode
+from statectl._interfaces.fs import FileSystem
+from statectl._interfaces.logger import Logger
+from statectl._interfaces.process import ProcessRunner
+from statectl._modules import DefaultLogger, RealFileSystem, RealProcessRunner
+from statectl._statechangers.state_changers import StateChangers
+from statectl._state_changer import (
     ExistingState,
     Result,
     ResultStatus,

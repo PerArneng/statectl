@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from statectl.interfaces.fs import (
+from statectl._interfaces.fs import (
     FileEntry,
     FileSystem,
     FsError,

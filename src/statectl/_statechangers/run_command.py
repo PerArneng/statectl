@@ -4,16 +4,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping, override
 
-from statectl.interfaces.fs import FileSystem
-from statectl.interfaces.process import (
+from statectl._interfaces.fs import FileSystem
+from statectl._interfaces.process import (
     ProcessDecodeError,
     ProcessLaunchError,
     ProcessNotFound,
     ProcessRunner,
     ProcessTimeout,
 )
-from statectl.modules import RealFileSystem, RealProcessRunner
-from statectl.state_changer import (
+from statectl._modules import RealFileSystem, RealProcessRunner
+from statectl._state_changer import (
     ExistingState,
     Parameters,
     Result,

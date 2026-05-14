@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from statectl.interfaces.fs import FsIoError
-from statectl import ExistingState
-from statectl.statechangers import (
+from statectl._interfaces.fs import FsIoError
+from statectl._state_changer import ExistingState
+from statectl._statechangers import (
     RunCommandParameters,
     RunCommandStateChanger,
 )

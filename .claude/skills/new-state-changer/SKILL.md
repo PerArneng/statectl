@@ -13,15 +13,15 @@ description: How to add a new StateChanger to the statectl project. Use this ski
 2. A `StateChanger` (or `RollbackableStateChanger`) class bound to those parameters.
 3. If rollbackable, an inverse plain `StateChanger` that undoes the transition.
 
-The canonical reference implementation is `src/statectl/statechangers/new_text_file.py` — read it before writing anything new. It demonstrates the full pattern (params dataclass, forward changer, rollback inverse, idempotent assessment).
+The canonical reference implementation is `src/statectl/_statechangers/new_text_file.py` — read it before writing anything new. It demonstrates the full pattern (params dataclass, forward changer, rollback inverse, idempotent assessment).
 
 ## File layout
 
-One module per changer family, placed at `src/statectl/statechangers/<snake_name>.py`. Put the params dataclass, the forward changer, and (if applicable) the rollback inverse in the same file — they're tightly coupled and a reader benefits from seeing them together.
+One module per changer family, placed at `src/statectl/_statechangers/<snake_name>.py`. Put the params dataclass, the forward changer, and (if applicable) the rollback inverse in the same file — they're tightly coupled and a reader benefits from seeing them together.
 
-Re-export the new changer (and its `Parameters`) from `src/statectl/statechangers/__init__.py` using a relative import, and add the names to `__all__`. Consumers import from the package:
+Re-export the new changer (and its `Parameters`) from `src/statectl/_statechangers/__init__.py` using a relative import, and add the names to `__all__`. Consumers import from the package:
 ```python
-from statectl.statechangers import YourStateChanger, YourParameters
+from statectl._statechangers import YourStateChanger, YourParameters
 ```
 
 ## Required imports
@@ -32,7 +32,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from statectl.state_changer import (
+from statectl._state_changer import (
     ExistingState,
     Parameters,
     Result,
@@ -41,11 +41,11 @@ from statectl.state_changer import (
     StateAssessment,
     StateChanger,
 )
-from statectl.interfaces.fs import FileSystem, FsError, FsNotFound  # capability + typed errors
-from statectl.modules import RealFileSystem                          # default for `None` capability kwarg
+from statectl._interfaces.fs import FileSystem, FsError, FsNotFound  # capability + typed errors
+from statectl._modules import RealFileSystem                          # default for `None` capability kwarg
 ```
 
-Top-level types (`StateChanger`, `Parameters`, …) come from `statectl.state_changer` (file path) rather than `statectl` (package surface) — inside `src/statectl/` source files this avoids circular load against the partially-initialized `src/statectl/__init__.py`. Capability ABCs and errors come from their interface package surface (`statectl.interfaces.<cap>`); real impls come from `statectl.modules` (flat — no per-capability subpackage).
+Top-level types (`StateChanger`, `Parameters`, …) come from `statectl._state_changer` (file path) — these are no longer re-exported from the public `statectl` package surface, so internal modules and tests must import them from the underscore-prefixed path. Capability ABCs and errors come from their interface package surface (`statectl._interfaces.<cap>`); real impls come from `statectl._modules` (flat — no per-capability subpackage).
 
 `@override` is required on every overriding method (`name`, `assess_state`, `transition`, `rollback`) under the project's strict pyrefly preset.
 
@@ -192,7 +192,7 @@ The engine logs each step via the injected `Logger`, halts on `INVALID` or trans
 
 ### Optional: surface it through the `StateChangers` factory
 
-If your changer is a candidate for the ergonomic built-in surface, add a method to `src/statectl/statechangers/state_changers.py` that flattens its `Parameters` into keyword args, coerces `str | Path` etc. at the boundary, and threads `self._fs` / `self._pr` to the constructor. This is optional — custom / project-specific changers can stay outside the factory and be constructed directly as shown above.
+If your changer is a candidate for the ergonomic built-in surface, add a method to `src/statectl/_statechangers/state_changers.py` that flattens its `Parameters` into keyword args, coerces `str | Path` etc. at the boundary, and threads `self._fs` / `self._pr` to the constructor. This is optional — custom / project-specific changers can stay outside the factory and be constructed directly as shown above.
 
 ## Tests are part of the deliverable
 
@@ -216,12 +216,12 @@ Tests must use only fakes — no real disk, no real subprocess, no real network.
 - `@override` on every overriding method — strict pyrefly enforces it.
 - Constructor takes `params: YourParameters` plus one keyword param per injected capability, each defaulting to its real impl. Don't accept loose kwargs; the params dataclass *is* the public API.
 - Concentrate side effects in `transition()` / rollback `transition()`. `assess_state` and `name` are pure.
-- Re-export the new changer + its `Parameters` from `src/statectl/statechangers/__init__.py` (relative import + `__all__`).
-- Inside the changer file, import capability ABCs/errors/real impls from the package surface (`from statectl.interfaces.fs import ...`); import top-level types from their file path (`from statectl.state_changer import StateChanger`).
+- Re-export the new changer + its `Parameters` from `src/statectl/_statechangers/__init__.py` (relative import + `__all__`).
+- Inside the changer file, import capability ABCs/errors/real impls from the package surface (`from statectl._interfaces.fs import ...`); import top-level types from their file path (`from statectl._state_changer import StateChanger`).
 
 ## Checklist before declaring done
 
-- [ ] New file at `src/statectl/statechangers/<name>.py`, re-exported from `src/statectl/statechangers/__init__.py` with `__all__`.
+- [ ] New file at `src/statectl/_statechangers/<name>.py`, re-exported from `src/statectl/_statechangers/__init__.py` with `__all__`.
 - [ ] Frozen `Parameters` subclass with only inputs.
 - [ ] Forward changer extends correct base (`StateChanger` vs `RollbackableStateChanger`).
 - [ ] `@override` decorator on every overriding method.
@@ -238,7 +238,7 @@ Tests must use only fakes — no real disk, no real subprocess, no real network.
 
 ## Canonical example
 
-`src/statectl/statechangers/new_text_file.py` — read it. It is the worked example for every pattern above:
+`src/statectl/_statechangers/new_text_file.py` — read it. It is the worked example for every pattern above:
 - `NewTextFileParameters(path, text, encoding)` — frozen dataclass.
 - `NewTextFileStateChanger` — extends `RollbackableStateChanger`. Assess collects all parent-side issues (missing / not-a-dir / not-writable); detects `ALREADY_APPLIED` by reading existing content and comparing with `params.text`; treats mismatched content as `INVALID`.
 - `NewTextFileRollbackStateChanger` — extends `StateChanger`. Assess returns `ALREADY_APPLIED` when the file is already gone, `INVALID` if the path turned into something unexpected, `READY` otherwise. Transition tolerates the race where the file disappears between assess and unlink (returns `SKIPPED`).

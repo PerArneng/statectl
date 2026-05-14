@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from typing import Mapping, Sequence, override
 
-from statectl.interfaces.process import (
+from statectl._interfaces.process import (
     ProcessDecodeError,
     ProcessLaunchError,
     ProcessNotFound,

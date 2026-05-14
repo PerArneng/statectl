@@ -4,15 +4,15 @@ from pathlib import Path
 
 import pytest
 
-from statectl.interfaces.process import (
+from statectl._interfaces.process import (
     ProcessDecodeError,
     ProcessError,
     ProcessLaunchError,
     ProcessNotFound,
     ProcessTimeout,
 )
-from statectl import ResultStatus
-from statectl.statechangers import (
+from statectl._state_changer import ResultStatus
+from statectl._statechangers import (
     RunCommandParameters,
     RunCommandStateChanger,
 )

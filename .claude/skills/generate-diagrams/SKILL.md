@@ -35,7 +35,7 @@ Always pass `--noshow` so it doesn't auto-open a browser. **Always pass `-T png`
 |---|---|
 | Default project graph | `task diagram` |
 | Whole repo incl. tests/examples | `uv run pydeps . --noshow -T png -o diagrams/all.png` |
-| Only one package | `uv run pydeps statectl/interfaces --noshow -T png -o diagrams/interfaces.png` |
+| Only one package | `uv run pydeps statectl/_interfaces --noshow -T png -o diagrams/interfaces.png` |
 | Include third-party deps | add `--externals` to any pydeps command |
 | Trim a too-dense graph | add `--max-bacon=2` (or `=3`) |
 | Arrows point *to* importer | add `--reverse` |
@@ -51,7 +51,7 @@ Always pass `--noshow` so it doesn't auto-open a browser. **Always pass `-T png`
 | Include inheritance ancestors | add `-A` |
 | Include associated classes | add `-S` |
 | Only show public members | add `--filter-mode=PUB_ONLY` |
-| Only one subpackage | `uv run pyreverse -o png -p statechangers -d diagrams statectl/statechangers` |
+| Only one subpackage | `uv run pyreverse -o png -p statechangers -d diagrams statectl/_statechangers` |
 | SVG instead of PNG | swap `-o png` → `-o svg` |
 | Mermaid text (renders in GitHub/Notion) | swap `-o png` → `-o mmd` (or run `task diagram-uml-mmd`) |
 | PlantUML text | swap `-o png` → `-o puml` (or run `task diagram-uml-puml`) |

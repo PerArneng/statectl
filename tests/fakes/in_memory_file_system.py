@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from statectl.interfaces.fs import (
+from statectl._interfaces.fs import (
     FileEntry,
     FileSystem,
     FsAlreadyExists,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from statectl.state_changer import StateChanger
+from statectl._state_changer import StateChanger
 
 
 class ExecutionNode:
