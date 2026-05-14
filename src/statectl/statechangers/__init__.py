@@ -7,6 +7,7 @@ from .run_command import (
     RunCommandParameters as RunCommandParameters,
     RunCommandStateChanger as RunCommandStateChanger,
 )
+from .state_changers import StateChangers as StateChangers
 
 __all__ = [
     "NewTextFileParameters",
@@ -14,4 +15,5 @@ __all__ = [
     "NewTextFileStateChanger",
     "RunCommandParameters",
     "RunCommandStateChanger",
+    "StateChangers",
 ]

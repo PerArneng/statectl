@@ -10,11 +10,7 @@ import logging
 import tempfile
 from pathlib import Path
 
-from statectl import StateCtlEngine
-from statectl.statechangers import (
-    NewTextFileParameters,
-    NewTextFileStateChanger,
-)
+from statectl import StateCtl
 
 
 def main() -> None:
@@ -22,13 +18,12 @@ def main() -> None:
 
     with tempfile.TemporaryDirectory() as tmp:
         target = Path(tmp) / "hello.txt"
-        changer = NewTextFileStateChanger(
-            NewTextFileParameters(path=target, text="hello from statectl\n")
-        )
 
-        engine = StateCtlEngine.create_engine()
-        engine.add(changer)
-        engine.start()
+        ctl = StateCtl.new()
+        sc = ctl.changers()
+
+        ctl.add(sc.new_file(target, "hello from statectl\n"))
+        ctl.start()
 
         print(f"--- contents of {target} ---")
         print(target.read_text())

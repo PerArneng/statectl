@@ -4,7 +4,7 @@ from pathlib import Path
 
 from statectl.interfaces.process import ProcessResult
 from statectl.modules import DefaultLogger
-from statectl import StateCtlEngine
+from statectl import StateCtl
 from statectl.statechangers import (
     RunCommandParameters,
     RunCommandStateChanger,
@@ -13,8 +13,15 @@ from tests.fakes.in_memory_file_system import InMemoryFileSystem
 from tests.fakes.scripted_process_runner import ScriptedProcessRunner
 
 
-def _engine() -> StateCtlEngine:
-    return StateCtlEngine(logger=DefaultLogger("test"))
+def _engine(
+    file_system: InMemoryFileSystem | None = None,
+    process_runner: ScriptedProcessRunner | None = None,
+) -> StateCtl:
+    return StateCtl(
+        logger=DefaultLogger("test"),
+        file_system=file_system or InMemoryFileSystem(),
+        process_runner=process_runner or ScriptedProcessRunner(),
+    )
 
 
 def test_engine_runs_command_then_skips_on_second_run_via_creates_hint() -> None:

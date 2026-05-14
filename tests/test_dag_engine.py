@@ -12,13 +12,15 @@ from statectl import (
 )
 from statectl import NodeOutcome
 from statectl.modules import DefaultLogger
+from tests.fakes.in_memory_file_system import InMemoryFileSystem
+from tests.fakes.scripted_process_runner import ScriptedProcessRunner
 from statectl import (
     ExistingState,
     Result,
     StateAssessment,
     StateChanger,
 )
-from statectl import StateCtlEngine
+from statectl import StateCtl
 
 
 class _ProgrammableChanger(StateChanger):
@@ -66,8 +68,12 @@ class _ProgrammableChanger(StateChanger):
         return Result.failure(code="ERR", message=f"{self._name} failed")
 
 
-def _engine() -> StateCtlEngine:
-    return StateCtlEngine(logger=DefaultLogger("test"))
+def _engine() -> StateCtl:
+    return StateCtl(
+        logger=DefaultLogger("test"),
+        file_system=InMemoryFileSystem(),
+        process_runner=ScriptedProcessRunner(),
+    )
 
 
 def test_unknown_dependency_raises_at_add_time() -> None:

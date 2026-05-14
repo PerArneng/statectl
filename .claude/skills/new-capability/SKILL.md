@@ -12,7 +12,7 @@ The reference example is the filesystem capability:
 - Typed errors: `src/statectl/interfaces/fs/fs_errors.py` (`FsError` base + all variants in one file)
 - Public surface: `src/statectl/interfaces/fs/__init__.py` (re-exports the ABC, value types, and every error with `__all__`)
 - Real implementation: `src/statectl/modules/real_file_system.py` (`RealFileSystem`), re-exported from `src/statectl/modules/__init__.py` (flat — modules do not have per-capability subpackages)
-- DI registration: `src/statectl/state_ctl_engine.py` `_Container.filesystem = providers.Singleton(RealFileSystem)`
+- DI registration: `src/statectl/state_ctl.py` `_Container.filesystem = providers.Singleton(RealFileSystem)`
 
 Read those files before adding a new capability — mirror their shape.
 
@@ -45,7 +45,7 @@ Every method that implements an interface method needs `@override` (`from typing
 
 ### 4. Register in the DI container
 
-In `src/statectl/state_ctl_engine.py`, add a `providers.Singleton(<RealImpl>)` entry to `_Container`, mirroring `logger` and `filesystem`. If the implementation depends on other capabilities, pass them as provider references.
+In `src/statectl/state_ctl.py`, add a `providers.Singleton(<RealImpl>)` entry to `_Container`, mirroring `logger` and `filesystem`. If the implementation depends on other capabilities, pass them as provider references.
 
 ### 5. Consume the capability
 

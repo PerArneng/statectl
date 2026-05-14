@@ -10,11 +10,7 @@ import logging
 import tempfile
 from pathlib import Path
 
-from statectl import StateCtlEngine
-from statectl.statechangers import (
-    RunCommandParameters,
-    RunCommandStateChanger,
-)
+from statectl import StateCtl
 
 
 def main() -> None:
@@ -23,24 +19,16 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         marker = Path(tmp) / "marker"
 
-        def make_changer() -> RunCommandStateChanger:
-            return RunCommandStateChanger(
-                RunCommandParameters(
-                    argv=("touch", str(marker)),
-                    creates=marker,
-                )
-            )
-
         print("--- first run: marker does not exist, command should run ---")
-        engine1 = StateCtlEngine.create_engine()
-        engine1.add(make_changer())
-        engine1.start()
+        ctl1 = StateCtl.new()
+        ctl1.add(ctl1.changers().run(["touch", str(marker)], creates=marker))
+        ctl1.start()
         assert marker.exists(), "expected touch to create the marker"
 
         print("\n--- second run: marker exists, command should be skipped ---")
-        engine2 = StateCtlEngine.create_engine()
-        engine2.add(make_changer())
-        engine2.start()
+        ctl2 = StateCtl.new()
+        ctl2.add(ctl2.changers().run(["touch", str(marker)], creates=marker))
+        ctl2.start()
 
 
 if __name__ == "__main__":

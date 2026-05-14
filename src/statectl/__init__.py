@@ -17,7 +17,7 @@ from .state_changer import (
     StateAssessment as StateAssessment,
     StateChanger as StateChanger,
 )
-from .state_ctl_engine import StateCtlEngine as StateCtlEngine
+from .state_ctl import StateCtl as StateCtl
 
 __all__ = [
     "DuplicateNodeError",
@@ -32,6 +32,6 @@ __all__ = [
     "RollbackableStateChanger",
     "StateAssessment",
     "StateChanger",
-    "StateCtlEngine",
+    "StateCtl",
     "UnknownDependencyError",
 ]

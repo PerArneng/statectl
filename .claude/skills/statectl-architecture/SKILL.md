@@ -1,6 +1,6 @@
 ---
 name: statectl-architecture
-description: Complete architectural reference for the statectl codebase — folder layout (src/ layout), core abstractions (StateChanger, capabilities, engine), the DAG execution model, the DI container wiring split, testing strategy with fakes, and the universal rules (no stdlib IO in changers outside modules/, @override on overrides, curated __init__.py re-exports with __all__, type hints everywhere). Use this skill whenever the user asks about how statectl is organized, where something belongs, why a pattern exists, how the engine executes nodes, how dependency injection is wired, how testing works, what the difference between an interface and a module is, or any architectural / design question about this repo. Also use proactively before designing a new feature, reviewing a non-trivial change, or onboarding to the codebase — knowing the architecture up front prevents shaped-wrong proposals. Triggers include phrases like "how does X work in statectl", "where should I put …", "why is …", "what's the pattern for …", "review this design", and any question that names types like StateChanger, StateCtlEngine, Parameters, FileSystem, ProcessRunner.
+description: Complete architectural reference for the statectl codebase — folder layout (src/ layout), core abstractions (StateChanger, capabilities, engine), the DAG execution model, the DI container wiring split, testing strategy with fakes, and the universal rules (no stdlib IO in changers outside modules/, @override on overrides, curated __init__.py re-exports with __all__, type hints everywhere). Use this skill whenever the user asks about how statectl is organized, where something belongs, why a pattern exists, how the engine executes nodes, how dependency injection is wired, how testing works, what the difference between an interface and a module is, or any architectural / design question about this repo. Also use proactively before designing a new feature, reviewing a non-trivial change, or onboarding to the codebase — knowing the architecture up front prevents shaped-wrong proposals. Triggers include phrases like "how does X work in statectl", "where should I put …", "why is …", "what's the pattern for …", "review this design", and any question that names types like StateChanger, StateCtl, Parameters, FileSystem, ProcessRunner.
 ---
 
 # statectl Architecture
@@ -22,8 +22,8 @@ Three layers, with dependencies flowing strictly downward:
                             │ uses
                             ▼
 ┌──────────────────────────────────────────────────────────┐
-│  Orchestration       statectl/state_ctl_engine.py        │
-│  StateCtlEngine — schedules nodes, fail-isolates         │
+│  Orchestration       statectl/state_ctl.py        │
+│  StateCtl — schedules nodes, fail-isolates         │
 │  ExecutionNode      statectl/execution_node.py (internal)│
 └──────────────────────────────────────────────────────────┘
                             │ runs
@@ -49,11 +49,11 @@ Three layers, with dependencies flowing strictly downward:
 └──────────────────────────────────────────────────────────┘
 ```
 
-**The cardinal property:** *nothing* in `interfaces/` or `state_changer.py` or `state_ctl_engine.py` imports anything from `modules/`. Side effects live behind ABCs.
+**The cardinal property:** *nothing* in `interfaces/` or `state_changer.py` or `state_ctl.py` imports anything from `modules/`. Side effects live behind ABCs.
 
 **Wiring split — read this carefully, it's a common point of confusion:**
 
-- The **DI container** (`_Container` at the bottom of `state_ctl_engine.py`) wires only **engine-internal** singletons: the logger and the engine itself. It also declares `filesystem` and `process_runner` providers, but those exist as a convenience — the engine doesn't inject them into state changers.
+- The **DI container** (`_Container` at the bottom of `state_ctl.py`) wires only **engine-internal** singletons: the logger and the engine itself. It also declares `filesystem` and `process_runner` providers, but those exist as a convenience — the engine doesn't inject them into state changers.
 - **State changers are wired manually by the driver.** Each changer accepts its capabilities as constructor kwargs and defaults `None` to the real impl (e.g. `self._fs: FileSystem = file_system or RealFileSystem()`). This keeps driver code terse — `NewTextFileStateChanger(params)` just works — while tests inject fakes through the same kwargs.
 - **Consequence:** it is *expected and intentional* that `statechangers/*.py` imports concrete classes from `src/statectl/modules/` for those defaults. The package-level dependency graph will show `statechangers/ → modules/` edges; these are not a layering violation, they are the ergonomic seam.
 
@@ -68,7 +68,7 @@ src/statectl/
 ├── py.typed                    # marks the package as typed (PEP 561)
 ├── state_changer.py            # core ABCs + value types (StateChanger, Parameters, Result, …)
 ├── execution_node.py           # ExecutionNode (internal graph node — engine builds these per add())
-├── state_ctl_engine.py         # StateCtlEngine + private _Container
+├── state_ctl.py         # StateCtl + private _Container
 ├── engine_result.py            # EngineResult, NodeReport, NodeOutcome
 ├── engine_error.py             # UnknownDependencyError, DuplicateNodeError (raised at add() time)
 │
@@ -159,7 +159,7 @@ An internal graph node the engine constructs from each `engine.add(changer, depe
 
 Keeping `ExecutionNode` private means changers stay pure (no graph state on them) and the user-facing API has exactly one construction surface (`engine.add`).
 
-### `StateCtlEngine` (`src/statectl/state_ctl_engine.py`)
+### `StateCtl` (`src/statectl/state_ctl.py`)
 
 Orchestrator. The driver-facing API is just `add` + `start`:
 
@@ -167,7 +167,7 @@ Orchestrator. The driver-facing API is just `add` + `start`:
 a = NewTextFileStateChanger(params_a)
 b = NewTextFileStateChanger(params_b)
 
-engine = StateCtlEngine.create_engine()
+engine = StateCtl.new()
 engine.add(a)
 engine.add(b, depends_on=[a])    # 'a' must already be added
 result = engine.start(max_workers=4)
@@ -185,7 +185,7 @@ These are the *only* configuration errors. **Cycles are structurally impossible*
 - **Fail-isolation:** when a node returns `FAILED_INVALID` or `FAILED_TRANSITION`, its transitive descendants are BFS-marked `BLOCKED` and never submitted. Sibling branches keep running.
 - Final `EngineResult.ok` is False iff any node ended in a failure or blocked state.
 
-`StateCtlEngine.create_engine()` is the recommended construction path — it uses the `_Container` and wires the real logger. Driver code rarely needs to inject capabilities by hand; changers accept capabilities as constructor kwargs with `None` → real-impl defaults.
+`StateCtl.new()` is the recommended construction path — it uses the `_Container` and wires the real logger. Driver code rarely needs to inject capabilities by hand; changers accept capabilities as constructor kwargs with `None` → real-impl defaults.
 
 ### `NodeOutcome` / `NodeReport` / `EngineResult` (`src/statectl/engine_result.py`)
 
@@ -207,7 +207,7 @@ Anything that touches the outside world (filesystem, network, processes, clock, 
 1. **Interface** in `src/statectl/interfaces/<capability>/<capability>.py` — pure ABC, type hints, no IO.
 2. **Typed errors** in `src/statectl/interfaces/<capability>/<capability>_errors.py` — a single file containing the base error (`FsError`, `ProcessError`) and every variant (`FsNotFound`, `FsPermissionDenied`, …). Re-export them all from the capability's `__init__.py`.
 3. **Real impl** in `src/statectl/modules/real_<capability>.py` (flat — no per-capability subpackage) — the *only* legal location for stdlib calls related to that capability. Typically uses a `_translate()` context manager that converts stdlib exceptions to typed interface errors. Re-export from `src/statectl/modules/__init__.py`.
-4. **DI wiring** in `_Container` at the bottom of `state_ctl_engine.py` — `providers.Singleton(RealFileSystem)`, etc.
+4. **DI wiring** in `_Container` at the bottom of `state_ctl.py` — `providers.Singleton(RealFileSystem)`, etc.
 5. **Test fake** in `tests/fakes/` — in-memory implementation honoring the same interface.
 
 The capability error hierarchy is what lets changers `try/except` precisely (e.g. catch `FsNotFound` to mean "file isn't there yet" vs. catch `FsError` for any FS problem). When proposing a new capability, see the `new-capability` skill.
@@ -227,7 +227,7 @@ These rules are non-negotiable because they preserve the layering above. Pyrefly
    from .fs_errors import FsError as FsError, FsNotFound as FsNotFound, ...
    __all__ = ["FileEntry", "FileSystem", "FsError", "FsNotFound", ...]
    ```
-   Callers (tests, examples, cross-subpackage source) import from the package surface: `from statectl.interfaces.fs import FileSystem, FsNotFound`. **Exception:** inside source files under `src/statectl/`, top-level types are imported from their file (`from statectl.state_changer import StateChanger`) — not via `from statectl import ...` — to avoid circular-load issues with the partially-initialized `src/statectl/__init__.py`. External code (tests, examples) does `from statectl import StateChanger, StateCtlEngine`.
+   Callers (tests, examples, cross-subpackage source) import from the package surface: `from statectl.interfaces.fs import FileSystem, FsNotFound`. **Exception:** inside source files under `src/statectl/`, top-level types are imported from their file (`from statectl.state_changer import StateChanger`) — not via `from statectl import ...` — to avoid circular-load issues with the partially-initialized `src/statectl/__init__.py`. External code (tests, examples) does `from statectl import StateChanger, StateCtl`.
 5. **Type hints on every signature and class attribute.** No bare `def foo(x):`. No untyped `self._x = None` either — annotate the attribute.
 6. **`@override` on every method that overrides an ABC or parent method** (`from typing import override`). Pyrefly is configured strict and rejects unannotated overrides. This catches typos in method names (`asses_state` vs `assess_state`) before runtime.
 7. **`assess_state()` is read-only.** Side effects belong in `transition()` / `rollback()`. Violating this breaks idempotency.

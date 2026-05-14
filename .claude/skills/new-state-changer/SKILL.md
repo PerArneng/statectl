@@ -183,7 +183,7 @@ The inverse class:
 You don't have to wire anything new — drivers consume your changer like any other:
 
 ```python
-engine = StateCtlEngine.create_engine()
+engine = StateCtl.new()
 engine.add(YourStateChanger(YourParameters(...)))
 engine.start()
 ```
@@ -201,7 +201,7 @@ A state changer ships with its test suite. The reference is `tests/statechangers
 - `test_<name>_transition_success.py` — happy path, including that `details` carry the expected fields and that capability fakes recorded exactly the expected calls
 - `test_<name>_transition_<failure-mode>.py` — one file per failure axis (e.g. unexpected exit, error matrix)
 - `test_<name>_transition_error_matrix.py` — parametrize over every typed-error subclass the capability raises; assert each maps to a specific failure `code`; include a negative test that a non-typed exception (`RuntimeError`) propagates
-- `test_<name>_end_to_end_through_engine.py` — integration: queue the changer in a real `StateCtlEngine` with fakes injected; assert engine behavior (skip on ALREADY_APPLIED, halt on FAILURE, halt on INVALID)
+- `test_<name>_end_to_end_through_engine.py` — integration: queue the changer in a real `StateCtl` with fakes injected; assert engine behavior (skip on ALREADY_APPLIED, halt on FAILURE, halt on INVALID)
 
 Tests must use only fakes — no real disk, no real subprocess, no real network. If a fake doesn't exist for a capability you need, see the `new-capability` skill.
 

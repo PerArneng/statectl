@@ -13,8 +13,11 @@ from statectl.engine_error import (
 )
 from statectl.engine_result import EngineResult, NodeOutcome, NodeReport
 from statectl.execution_node import ExecutionNode
+from statectl.interfaces.fs import FileSystem
 from statectl.interfaces.logger import Logger
+from statectl.interfaces.process import ProcessRunner
 from statectl.modules import DefaultLogger, RealFileSystem, RealProcessRunner
+from statectl.statechangers.state_changers import StateChangers
 from statectl.state_changer import (
     ExistingState,
     Result,
@@ -24,11 +27,21 @@ from statectl.state_changer import (
 )
 
 
-class StateCtlEngine:
-    def __init__(self, logger: Logger) -> None:
+class StateCtl:
+    def __init__(
+        self,
+        logger: Logger,
+        file_system: FileSystem,
+        process_runner: ProcessRunner,
+    ) -> None:
         self._logger: Logger = logger
+        self._fs: FileSystem = file_system
+        self._pr: ProcessRunner = process_runner
         self._nodes: list[ExecutionNode] = []
         self._node_by_changer_id: dict[int, ExecutionNode] = {}
+
+    def changers(self) -> StateChangers:
+        return StateChangers(file_system=self._fs, process_runner=self._pr)
 
     def add(
         self,
@@ -58,7 +71,7 @@ class StateCtlEngine:
 
         workers: int = max_workers if max_workers is not None else (os.cpu_count() or 1)
         self._logger.info(
-            "StateCtlEngine started with %d node(s), max_workers=%d",
+            "StateCtl started with %d node(s), max_workers=%d",
             len(self._nodes),
             workers,
         )
@@ -132,7 +145,7 @@ class StateCtlEngine:
 
         engine_result = EngineResult(reports=tuple(reports))
         self._logger.info(
-            "StateCtlEngine finished: ok=%s (%d node(s))",
+            "StateCtl finished: ok=%s (%d node(s))",
             engine_result.ok,
             len(reports),
         )
@@ -189,8 +202,15 @@ class StateCtlEngine:
         )
 
     @staticmethod
-    def create_engine() -> StateCtlEngine:
+    def new(
+        file_system: FileSystem | None = None,
+        process_runner: ProcessRunner | None = None,
+    ) -> StateCtl:
         container = _Container()
+        if file_system is not None:
+            container.filesystem.override(providers.Object(file_system))
+        if process_runner is not None:
+            container.process_runner.override(providers.Object(process_runner))
         return container.engine()
 
 
@@ -198,4 +218,9 @@ class _Container(containers.DeclarativeContainer):
     logger = providers.Singleton(DefaultLogger)
     filesystem = providers.Singleton(RealFileSystem)
     process_runner = providers.Singleton(RealProcessRunner)
-    engine = providers.Singleton(StateCtlEngine, logger=logger)
+    engine = providers.Singleton(
+        StateCtl,
+        logger=logger,
+        file_system=filesystem,
+        process_runner=process_runner,
+    )
