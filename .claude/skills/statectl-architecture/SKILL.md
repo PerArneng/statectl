@@ -1,6 +1,6 @@
 ---
 name: statectl-architecture
-description: Complete architectural reference for the statectl codebase — folder layout (src/ layout), core abstractions (StateChanger, ExecutionNode, capabilities, engine), the DAG execution model, the DI container wiring split, testing strategy with fakes, and the universal rules (no stdlib IO in changers outside modules/, @override on overrides, curated __init__.py re-exports with __all__, type hints everywhere). Use this skill whenever the user asks about how statectl is organized, where something belongs, why a pattern exists, how the engine executes nodes, how dependency injection is wired, how testing works, what the difference between an interface and a module is, or any architectural / design question about this repo. Also use proactively before designing a new feature, reviewing a non-trivial change, or onboarding to the codebase — knowing the architecture up front prevents shaped-wrong proposals. Triggers include phrases like "how does X work in statectl", "where should I put …", "why is …", "what's the pattern for …", "review this design", and any question that names types like StateChanger, ExecutionNode, StateCtlEngine, Parameters, FileSystem, ProcessRunner.
+description: Complete architectural reference for the statectl codebase — folder layout (src/ layout), core abstractions (StateChanger, capabilities, engine), the DAG execution model, the DI container wiring split, testing strategy with fakes, and the universal rules (no stdlib IO in changers outside modules/, @override on overrides, curated __init__.py re-exports with __all__, type hints everywhere). Use this skill whenever the user asks about how statectl is organized, where something belongs, why a pattern exists, how the engine executes nodes, how dependency injection is wired, how testing works, what the difference between an interface and a module is, or any architectural / design question about this repo. Also use proactively before designing a new feature, reviewing a non-trivial change, or onboarding to the codebase — knowing the architecture up front prevents shaped-wrong proposals. Triggers include phrases like "how does X work in statectl", "where should I put …", "why is …", "what's the pattern for …", "review this design", and any question that names types like StateChanger, StateCtlEngine, Parameters, FileSystem, ProcessRunner.
 ---
 
 # statectl Architecture
@@ -16,14 +16,15 @@ Three layers, with dependencies flowing strictly downward:
 ```
 ┌──────────────────────────────────────────────────────────┐
 │  Driver code (examples/, user code)                      │
-│  Builds ExecutionNodes, wires the DAG, calls start()     │
+│  Constructs changers, calls engine.add(changer, deps),   │
+│  then engine.start()                                     │
 └──────────────────────────────────────────────────────────┘
                             │ uses
                             ▼
 ┌──────────────────────────────────────────────────────────┐
 │  Orchestration       statectl/state_ctl_engine.py        │
-│  StateCtlEngine — validates the graph, schedules nodes   │
-│  ExecutionNode      statectl/execution_node.py           │
+│  StateCtlEngine — schedules nodes, fail-isolates         │
+│  ExecutionNode      statectl/execution_node.py (internal)│
 └──────────────────────────────────────────────────────────┘
                             │ runs
                             ▼
@@ -66,10 +67,10 @@ Repo uses the PyPA-recommended **`src/` layout** — the importable package live
 src/statectl/
 ├── py.typed                    # marks the package as typed (PEP 561)
 ├── state_changer.py            # core ABCs + value types (StateChanger, Parameters, Result, …)
-├── execution_node.py           # ExecutionNode (graph node wrapping one changer)
+├── execution_node.py           # ExecutionNode (internal graph node — engine builds these per add())
 ├── state_ctl_engine.py         # StateCtlEngine + private _Container
 ├── engine_result.py            # EngineResult, NodeReport, NodeOutcome
-├── engine_error.py             # CycleDetectedError, UnknownDependencyError, DuplicateNodeError
+├── engine_error.py             # UnknownDependencyError, DuplicateNodeError (raised at add() time)
 │
 ├── __init__.py                 # public surface (re-exports top-level types with __all__)
 │
@@ -152,30 +153,33 @@ Every changer is constructed with a frozen `Parameters` subclass holding its inp
 1. **Equality semantics.** Changers can be compared and deduplicated by their params.
 2. **No surprises mid-run.** A changer that mutated its params during `transition()` would make `assess_state()` non-deterministic.
 
-### `ExecutionNode` (`src/statectl/execution_node.py`)
+### `ExecutionNode` (`src/statectl/execution_node.py`) — internal
 
-A node in the engine's execution DAG. Wraps exactly one `StateChanger` and holds upstream node references. Identity is the node object itself — *not* the wrapped changer's name. (You could legitimately have two nodes wrapping different instances of the same changer type with different parameters.)
+An internal graph node the engine constructs from each `engine.add(changer, depends_on=...)` call. **Not part of the user-facing API** — `statectl.__init__` does not re-export it. Users never instantiate `ExecutionNode` directly; the changer itself is the dependency handle. The class is still importable from `statectl.execution_node` for introspection (e.g. tests that inspect the engine's internal graph).
 
-```python
-node_a = ExecutionNode(changer_a)
-node_b = ExecutionNode(changer_b, depends_on=[node_a])
-node_c = ExecutionNode(changer_c).depends_on(node_a, node_b)
-```
-
-Important: the changer is the unit of work, the node is the unit of *graph membership*. Keeping them separate means changers stay pure (no graph state on them) and the same changer instance could in principle appear in multiple nodes — though deliberate, not accidental.
+Keeping `ExecutionNode` private means changers stay pure (no graph state on them) and the user-facing API has exactly one construction surface (`engine.add`).
 
 ### `StateCtlEngine` (`src/statectl/state_ctl_engine.py`)
 
-Orchestrator. Two-phase execution:
+Orchestrator. The driver-facing API is just `add` + `start`:
 
-**Phase A — validation (before any changer runs):**
-1. Every referenced upstream node must have been `add`ed → else `UnknownDependencyError`.
-2. Same node added twice → `DuplicateNodeError` (caught at `add()` time, not `start()`).
-3. Run Kahn's algorithm over the graph; if not all nodes get visited, the unvisited set is a cycle → `CycleDetectedError(nodes=[...])`.
+```python
+a = NewTextFileStateChanger(params_a)
+b = NewTextFileStateChanger(params_b)
 
-These are *configuration* errors — they raise before any side effect happens. Catch them in the driver if you want; don't catch them inside a changer.
+engine = StateCtlEngine.create_engine()
+engine.add(a)
+engine.add(b, depends_on=[a])    # 'a' must already be added
+result = engine.start(max_workers=4)
+```
 
-**Phase B — parallel scheduling:**
+**Configuration errors are raised eagerly at `add()` time, before any changer runs:**
+- Same changer instance added twice → `DuplicateNodeError`.
+- A `depends_on` reference to a changer not yet added → `UnknownDependencyError`.
+
+These are the *only* configuration errors. **Cycles are structurally impossible** because every dependency must point to an already-added changer — the graph is built in topological order by construction. There is no separate validation phase at `start()` time.
+
+**Execution — parallel scheduling:**
 - `ThreadPoolExecutor` with `max_workers` (defaults to `os.cpu_count() or 1`).
 - All bookkeeping (in-degree, outcomes, blocked-set) lives on the main thread; worker threads only run `_run_node(node)` and return a `NodeReport`. **No locks needed inside the engine** because of this discipline — preserve it.
 - **Fail-isolation:** when a node returns `FAILED_INVALID` or `FAILED_TRANSITION`, its transitive descendants are BFS-marked `BLOCKED` and never submitted. Sibling branches keep running.
@@ -223,7 +227,7 @@ These rules are non-negotiable because they preserve the layering above. Pyrefly
    from .fs_errors import FsError as FsError, FsNotFound as FsNotFound, ...
    __all__ = ["FileEntry", "FileSystem", "FsError", "FsNotFound", ...]
    ```
-   Callers (tests, examples, cross-subpackage source) import from the package surface: `from statectl.interfaces.fs import FileSystem, FsNotFound`. **Exception:** inside source files under `src/statectl/`, top-level types are imported from their file (`from statectl.state_changer import StateChanger`) — not via `from statectl import ...` — to avoid circular-load issues with the partially-initialized `src/statectl/__init__.py`. External code (tests, examples) does `from statectl import StateChanger, ExecutionNode`.
+   Callers (tests, examples, cross-subpackage source) import from the package surface: `from statectl.interfaces.fs import FileSystem, FsNotFound`. **Exception:** inside source files under `src/statectl/`, top-level types are imported from their file (`from statectl.state_changer import StateChanger`) — not via `from statectl import ...` — to avoid circular-load issues with the partially-initialized `src/statectl/__init__.py`. External code (tests, examples) does `from statectl import StateChanger, StateCtlEngine`.
 5. **Type hints on every signature and class attribute.** No bare `def foo(x):`. No untyped `self._x = None` either — annotate the attribute.
 6. **`@override` on every method that overrides an ABC or parent method** (`from typing import override`). Pyrefly is configured strict and rejects unannotated overrides. This catches typos in method names (`asses_state` vs `assess_state`) before runtime.
 7. **`assess_state()` is read-only.** Side effects belong in `transition()` / `rollback()`. Violating this breaks idempotency.

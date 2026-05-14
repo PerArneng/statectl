@@ -10,7 +10,6 @@ import logging
 import tempfile
 from pathlib import Path
 
-from statectl import ExecutionNode
 from statectl import StateCtlEngine
 from statectl.statechangers import (
     NewTextFileParameters,
@@ -28,7 +27,7 @@ def main() -> None:
         )
 
         engine = StateCtlEngine.create_engine()
-        engine.add(ExecutionNode(changer))
+        engine.add(changer)
         engine.start()
 
         print(f"--- contents of {target} ---")

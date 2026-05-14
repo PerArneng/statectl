@@ -3,11 +3,11 @@ from __future__ import annotations
 import os
 from collections import deque
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
+from typing import Sequence
 
 from dependency_injector import containers, providers
 
 from statectl.engine_error import (
-    CycleDetectedError,
     DuplicateNodeError,
     UnknownDependencyError,
 )
@@ -20,6 +20,7 @@ from statectl.state_changer import (
     Result,
     ResultStatus,
     StateAssessment,
+    StateChanger,
 )
 
 
@@ -27,19 +28,26 @@ class StateCtlEngine:
     def __init__(self, logger: Logger) -> None:
         self._logger: Logger = logger
         self._nodes: list[ExecutionNode] = []
+        self._node_by_changer_id: dict[int, ExecutionNode] = {}
 
-    def add(self, node: ExecutionNode) -> None:
-        if any(n is node for n in self._nodes):
-            raise DuplicateNodeError(node.name())
+    def add(
+        self,
+        changer: StateChanger,
+        depends_on: Sequence[StateChanger] = (),
+    ) -> None:
+        if id(changer) in self._node_by_changer_id:
+            raise DuplicateNodeError(changer.name())
+        upstreams: list[ExecutionNode] = []
+        for dep in depends_on:
+            dep_node = self._node_by_changer_id.get(id(dep))
+            if dep_node is None:
+                raise UnknownDependencyError(changer.name(), dep.name())
+            upstreams.append(dep_node)
+        node = ExecutionNode(changer, upstreams=upstreams)
         self._nodes.append(node)
+        self._node_by_changer_id[id(changer)] = node
 
     def start(self, max_workers: int | None = None) -> EngineResult:
-        registered: set[int] = {id(n) for n in self._nodes}
-        for node in self._nodes:
-            for up in node.upstreams:
-                if id(up) not in registered:
-                    raise UnknownDependencyError(node.name(), up.name())
-
         downstreams: dict[ExecutionNode, list[ExecutionNode]] = {
             n: [] for n in self._nodes
         }
@@ -47,8 +55,6 @@ class StateCtlEngine:
         for node in self._nodes:
             for up in node.upstreams:
                 downstreams[up].append(node)
-
-        self._detect_cycle(in_degree, downstreams)
 
         workers: int = max_workers if max_workers is not None else (os.cpu_count() or 1)
         self._logger.info(
@@ -131,27 +137,6 @@ class StateCtlEngine:
             len(reports),
         )
         return engine_result
-
-    def _detect_cycle(
-        self,
-        in_degree: dict[ExecutionNode, int],
-        downstreams: dict[ExecutionNode, list[ExecutionNode]],
-    ) -> None:
-        remaining: dict[ExecutionNode, int] = dict(in_degree)
-        queue: deque[ExecutionNode] = deque(
-            n for n in self._nodes if remaining[n] == 0
-        )
-        visited: int = 0
-        while queue:
-            node = queue.popleft()
-            visited += 1
-            for d in downstreams[node]:
-                remaining[d] -= 1
-                if remaining[d] == 0:
-                    queue.append(d)
-        if visited < len(self._nodes):
-            names = [n.name() for n in self._nodes if remaining[n] > 0]
-            raise CycleDetectedError(names)
 
     def _run_node(self, node: ExecutionNode) -> NodeReport:
         name = node.name()

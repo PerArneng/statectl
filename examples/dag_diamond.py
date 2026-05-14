@@ -10,7 +10,6 @@ import logging
 import tempfile
 from pathlib import Path
 
-from statectl import ExecutionNode
 from statectl import StateCtlEngine
 from statectl.statechangers import (
     NewTextFileParameters,
@@ -35,14 +34,16 @@ def main() -> None:
         #   b   c
         #    \ /
         #     d
-        a = ExecutionNode(file_changer("a"))
-        b = ExecutionNode(file_changer("b"), depends_on=[a])
-        c = ExecutionNode(file_changer("c"), depends_on=[a])
-        d = ExecutionNode(file_changer("d"), depends_on=[b, c])
+        a = file_changer("a")
+        b = file_changer("b")
+        c = file_changer("c")
+        d = file_changer("d")
 
         engine = StateCtlEngine.create_engine()
-        for node in (a, b, c, d):
-            engine.add(node)
+        engine.add(a)
+        engine.add(b, depends_on=[a])
+        engine.add(c, depends_on=[a])
+        engine.add(d, depends_on=[b, c])
 
         result = engine.start(max_workers=4)
         print(f"\nengine ok = {result.ok}")

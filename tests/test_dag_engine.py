@@ -7,12 +7,10 @@ from typing import override
 import pytest
 
 from statectl import (
-    CycleDetectedError,
     DuplicateNodeError,
     UnknownDependencyError,
 )
 from statectl import NodeOutcome
-from statectl import ExecutionNode
 from statectl.modules import DefaultLogger
 from statectl import (
     ExistingState,
@@ -72,38 +70,19 @@ def _engine() -> StateCtlEngine:
     return StateCtlEngine(logger=DefaultLogger("test"))
 
 
-def test_cycle_detected_raises_before_any_transition() -> None:
+def test_unknown_dependency_raises_at_add_time() -> None:
     recorder: list[str] = []
-    a = ExecutionNode(_ProgrammableChanger("a", recorder))
-    b = ExecutionNode(_ProgrammableChanger("b", recorder))
-    a.depends_on(b)
-    b.depends_on(a)
+    a = _ProgrammableChanger("a", recorder)
+    b = _ProgrammableChanger("b", recorder)
 
     engine = _engine()
-    engine.add(a)
-    engine.add(b)
-
-    with pytest.raises(CycleDetectedError) as exc:
-        engine.start(max_workers=1)
-    assert set(exc.value.nodes) == {"a", "b"}
-    assert recorder == []
-
-
-def test_unknown_dependency_raises() -> None:
-    recorder: list[str] = []
-    a = ExecutionNode(_ProgrammableChanger("a", recorder))
-    b = ExecutionNode(_ProgrammableChanger("b", recorder), depends_on=[a])
-
-    engine = _engine()
-    engine.add(b)  # 'a' not added
-
     with pytest.raises(UnknownDependencyError):
-        engine.start(max_workers=1)
+        engine.add(b, depends_on=[a])  # 'a' not added yet
 
 
-def test_duplicate_node_raises() -> None:
+def test_duplicate_changer_raises() -> None:
     recorder: list[str] = []
-    a = ExecutionNode(_ProgrammableChanger("a", recorder))
+    a = _ProgrammableChanger("a", recorder)
 
     engine = _engine()
     engine.add(a)
@@ -111,22 +90,12 @@ def test_duplicate_node_raises() -> None:
         engine.add(a)
 
 
-def test_self_dependency_rejected() -> None:
-    recorder: list[str] = []
-    a = ExecutionNode(_ProgrammableChanger("a", recorder))
-    with pytest.raises(ValueError):
-        a.depends_on(a)
-
-
 def test_independent_roots_all_run() -> None:
     recorder: list[str] = []
-    nodes = [
-        ExecutionNode(_ProgrammableChanger(name, recorder))
-        for name in ("a", "b", "c")
-    ]
+    changers = [_ProgrammableChanger(name, recorder) for name in ("a", "b", "c")]
     engine = _engine()
-    for n in nodes:
-        engine.add(n)
+    for c in changers:
+        engine.add(c)
 
     result = engine.start(max_workers=1)
     assert result.ok
@@ -136,14 +105,14 @@ def test_independent_roots_all_run() -> None:
 
 def test_linear_chain_runs_in_topological_order() -> None:
     recorder: list[str] = []
-    a = ExecutionNode(_ProgrammableChanger("a", recorder))
-    b = ExecutionNode(_ProgrammableChanger("b", recorder), depends_on=[a])
-    c = ExecutionNode(_ProgrammableChanger("c", recorder), depends_on=[b])
+    a = _ProgrammableChanger("a", recorder)
+    b = _ProgrammableChanger("b", recorder)
+    c = _ProgrammableChanger("c", recorder)
 
     engine = _engine()
     engine.add(a)
-    engine.add(b)
-    engine.add(c)
+    engine.add(b, depends_on=[a])
+    engine.add(c, depends_on=[b])
     result = engine.start(max_workers=1)
 
     assert result.ok
@@ -152,14 +121,16 @@ def test_linear_chain_runs_in_topological_order() -> None:
 
 def test_diamond_runs_all_with_join_last() -> None:
     recorder: list[str] = []
-    a = ExecutionNode(_ProgrammableChanger("a", recorder))
-    b = ExecutionNode(_ProgrammableChanger("b", recorder), depends_on=[a])
-    c = ExecutionNode(_ProgrammableChanger("c", recorder), depends_on=[a])
-    d = ExecutionNode(_ProgrammableChanger("d", recorder), depends_on=[b, c])
+    a = _ProgrammableChanger("a", recorder)
+    b = _ProgrammableChanger("b", recorder)
+    c = _ProgrammableChanger("c", recorder)
+    d = _ProgrammableChanger("d", recorder)
 
     engine = _engine()
-    for n in (a, b, c, d):
-        engine.add(n)
+    engine.add(a)
+    engine.add(b, depends_on=[a])
+    engine.add(c, depends_on=[a])
+    engine.add(d, depends_on=[b, c])
 
     result = engine.start(max_workers=1)
     assert result.ok
@@ -170,14 +141,16 @@ def test_diamond_runs_all_with_join_last() -> None:
 
 def test_failure_isolates_descendants_but_lets_siblings_run() -> None:
     recorder: list[str] = []
-    a = ExecutionNode(_ProgrammableChanger("a", recorder, succeed=False))
-    b = ExecutionNode(_ProgrammableChanger("b", recorder), depends_on=[a])
-    c = ExecutionNode(_ProgrammableChanger("c", recorder), depends_on=[b])
-    sib = ExecutionNode(_ProgrammableChanger("sib", recorder))
+    a = _ProgrammableChanger("a", recorder, succeed=False)
+    b = _ProgrammableChanger("b", recorder)
+    c = _ProgrammableChanger("c", recorder)
+    sib = _ProgrammableChanger("sib", recorder)
 
     engine = _engine()
-    for n in (a, b, c, sib):
-        engine.add(n)
+    engine.add(a)
+    engine.add(b, depends_on=[a])
+    engine.add(c, depends_on=[b])
+    engine.add(sib)
 
     result = engine.start(max_workers=1)
     assert not result.ok
@@ -193,15 +166,14 @@ def test_failure_isolates_descendants_but_lets_siblings_run() -> None:
 
 def test_invalid_assessment_blocks_descendants_only() -> None:
     recorder: list[str] = []
-    a = ExecutionNode(
-        _ProgrammableChanger("a", recorder, state=ExistingState.INVALID)
-    )
-    b = ExecutionNode(_ProgrammableChanger("b", recorder), depends_on=[a])
-    sib = ExecutionNode(_ProgrammableChanger("sib", recorder))
+    a = _ProgrammableChanger("a", recorder, state=ExistingState.INVALID)
+    b = _ProgrammableChanger("b", recorder)
+    sib = _ProgrammableChanger("sib", recorder)
 
     engine = _engine()
-    for n in (a, b, sib):
-        engine.add(n)
+    engine.add(a)
+    engine.add(b, depends_on=[a])
+    engine.add(sib)
 
     result = engine.start(max_workers=1)
     by_name = {r.node_name: r.outcome for r in result.reports}
@@ -213,14 +185,12 @@ def test_invalid_assessment_blocks_descendants_only() -> None:
 
 def test_already_applied_propagates_as_success() -> None:
     recorder: list[str] = []
-    a = ExecutionNode(
-        _ProgrammableChanger("a", recorder, state=ExistingState.ALREADY_APPLIED)
-    )
-    b = ExecutionNode(_ProgrammableChanger("b", recorder), depends_on=[a])
+    a = _ProgrammableChanger("a", recorder, state=ExistingState.ALREADY_APPLIED)
+    b = _ProgrammableChanger("b", recorder)
 
     engine = _engine()
     engine.add(a)
-    engine.add(b)
+    engine.add(b, depends_on=[a])
 
     result = engine.start(max_workers=1)
     assert result.ok
@@ -235,20 +205,18 @@ def test_real_parallelism_overlaps_root_nodes() -> None:
     spans: list[tuple[str, float, float]] = []
     lock = threading.Lock()
 
-    def make(name: str) -> ExecutionNode:
-        return ExecutionNode(
-            _ProgrammableChanger(
-                name,
-                recorder,
-                sleep_s=0.1,
-                record_span=spans,
-                span_lock=lock,
-            )
+    def make(name: str) -> _ProgrammableChanger:
+        return _ProgrammableChanger(
+            name,
+            recorder,
+            sleep_s=0.1,
+            record_span=spans,
+            span_lock=lock,
         )
 
     engine = _engine()
-    for n in (make("a"), make("b"), make("c")):
-        engine.add(n)
+    for c in (make("a"), make("b"), make("c")):
+        engine.add(c)
 
     t0 = time.monotonic()
     result = engine.start(max_workers=3)

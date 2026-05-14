@@ -5,14 +5,6 @@ class EngineConfigurationError(Exception):
     """Base for configuration errors raised before any changer runs."""
 
 
-class CycleDetectedError(EngineConfigurationError):
-    def __init__(self, nodes: list[str]) -> None:
-        self.nodes: list[str] = nodes
-        super().__init__(
-            f"cycle detected among nodes: {', '.join(nodes)}"
-        )
-
-
 class UnknownDependencyError(EngineConfigurationError):
     def __init__(self, node: str, missing: str) -> None:
         self.node: str = node
