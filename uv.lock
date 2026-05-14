@@ -224,7 +224,7 @@ dev = [
     { name = "pylint", specifier = ">=3.0" },
     { name = "pyrefly", specifier = ">=1.0.0" },
     { name = "pytest", specifier = ">=9.0.3" },
-    { name = "ruff", specifier = ">=0.7" },
+    { name = "ruff", specifier = ">=0.15.13" },
 ]
 
 [[package]]
