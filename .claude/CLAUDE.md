@@ -8,7 +8,8 @@ Three core concepts:
 
 - **`StateChanger`** (`statectl/state_changer.py`) — ABC for one directional state change. Methods: `name()`, `assess_state() -> StateAssessment`, `transition() -> Result`. Bound to a frozen `Parameters` subclass.
 - **`RollbackableStateChanger`** — extends `StateChanger` with `rollback() -> StateChanger`. The inverse is a plain `StateChanger`, so the type system forbids rollback-of-rollback.
-- **`StateCtlEngine`** (`statectl/state_ctl_engine.py`) — orchestrator built via `StateCtlEngine.create_engine()`. Drivers `engine.add(changer)` then `engine.start()`; the engine dispatches on `assess_state()` (`READY` → run, `ALREADY_APPLIED` → skip, `INVALID` → halt) and halts on transition `FAILURE`.
+- **`ExecutionNode`** (`statectl/execution_node.py`) — graph node wrapping one `StateChanger` with upstream `depends_on` references. The graph lives outside the changer.
+- **`StateCtlEngine`** (`statectl/state_ctl_engine.py`) — orchestrator built via `StateCtlEngine.create_engine()`. Drivers `engine.add(node)` then `engine.start(max_workers=...)`; the engine validates the graph (Kahn's, raises `CycleDetectedError` / `UnknownDependencyError`), runs roots in a `ThreadPoolExecutor`, and **fail-isolates** — a failed or `INVALID` node marks only its transitive descendants `BLOCKED`; siblings keep running. `start()` returns an `EngineResult` with per-node `NodeReport`s.
 
 ## Layout
 
@@ -22,7 +23,8 @@ Three core concepts:
 
 ## Universal rules
 
-- **No stdlib IO in state changers or modules.** Any filesystem/network/process/clock/env call goes behind an interface in `statectl/interfaces/` with a real impl in `statectl/modules/` and DI wiring in `_Container`. See the `new-capability` skill.
+- **No stdlib IO in state changers or modules.** Any filesystem/network/process/clock/env call goes behind an interface in `statectl/interfaces/` with a real impl in `statectl/modules/`. See the `new-capability` skill.
+- **Wiring split:** the DI `_Container` wires only engine-internal singletons (logger, engine). State changers are wired manually by the driver — they accept capabilities as constructor kwargs and default `None` to the real impl (e.g. `RealFileSystem()`) so trivial driver code stays terse. Tests inject fakes through the same kwargs. This means it's expected and intentional for `statechangers/*.py` to import from `statectl/modules/`.
 - **No real IO in tests.** Tests drive state changers through fakes (`tests/fakes/`). A test that touches the real disk, network, or process table is a bug.
 - **One class per file**, filename = snake_case of class (e.g. `RealFileSystem` → `real_file_system.py`). Small private helpers / sibling dataclasses used only by that class may share the file.
 - **`__init__.py` files stay empty.** Import from the actual module path, never via package re-exports.
