@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from statectl.execution_node import ExecutionNode
 from statectl.interfaces.process.process_result import ProcessResult
 from statectl.modules.logger.default_logger import DefaultLogger
 from statectl.state_ctl_engine import StateCtlEngine
@@ -29,13 +30,15 @@ def test_engine_runs_command_then_skips_on_second_run_via_creates_hint() -> None
     # effect by creating the marker (the real touch would do this).
     engine1 = _engine()
     engine1.add(
-        RunCommandStateChanger(
-            RunCommandParameters(argv=("touch", str(marker)), creates=marker),
-            process_runner=pr,
-            file_system=fs,
+        ExecutionNode(
+            RunCommandStateChanger(
+                RunCommandParameters(argv=("touch", str(marker)), creates=marker),
+                process_runner=pr,
+                file_system=fs,
+            )
         )
     )
-    engine1.start()
+    engine1.start(max_workers=1)
     assert len(pr.calls) == 1
 
     # Simulate that the command produced the artifact.
@@ -44,13 +47,15 @@ def test_engine_runs_command_then_skips_on_second_run_via_creates_hint() -> None
     # Second engine run: marker exists, assess returns ALREADY_APPLIED, skip.
     engine2 = _engine()
     engine2.add(
-        RunCommandStateChanger(
-            RunCommandParameters(argv=("touch", str(marker)), creates=marker),
-            process_runner=pr,
-            file_system=fs,
+        ExecutionNode(
+            RunCommandStateChanger(
+                RunCommandParameters(argv=("touch", str(marker)), creates=marker),
+                process_runner=pr,
+                file_system=fs,
+            )
         )
     )
-    engine2.start()
+    engine2.start(max_workers=1)
     assert len(pr.calls) == 1  # no new call
 
 
@@ -78,9 +83,11 @@ def test_engine_halts_on_failure_and_does_not_run_subsequent_changers() -> None:
     )
 
     engine = _engine()
-    engine.add(failing)
-    engine.add(after)
-    engine.start()
+    fail_node = ExecutionNode(failing)
+    after_node = ExecutionNode(after, depends_on=[fail_node])
+    engine.add(fail_node)
+    engine.add(after_node)
+    engine.start(max_workers=1)
 
     argvs = [c.argv for c in pr.calls]
     assert ("fails",) in argvs
@@ -98,8 +105,8 @@ def test_engine_halts_on_invalid_assessment() -> None:
     )
 
     engine = _engine()
-    engine.add(invalid)
-    engine.start()
+    engine.add(ExecutionNode(invalid))
+    engine.start(max_workers=1)
 
     # transition was never called because assess returned INVALID
     assert pr.calls == []

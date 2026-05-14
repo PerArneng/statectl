@@ -18,8 +18,22 @@ tasks:
       - mkdir -p diagrams
       - uv run pyreverse -o png -p statectl -d diagrams statectl
 
+  diagram-uml-mmd:
+    desc: UML class + package diagrams as Mermaid text (pyreverse) → diagrams/classes_statectl.mmd + diagrams/packages_statectl.mmd
+    cmds:
+      - mkdir -p diagrams
+      - uv run pyreverse -o mmd -p statectl -d diagrams statectl
+
+  diagram-uml-puml:
+    desc: UML class + package diagrams as PlantUML text (pyreverse) → diagrams/classes_statectl.puml + diagrams/packages_statectl.puml
+    cmds:
+      - mkdir -p diagrams
+      - uv run pyreverse -o puml -p statectl -d diagrams statectl
+
   diagrams:
-    desc: Generate all diagrams (modules, classes, packages) into diagrams/
+    desc: Generate all diagrams (modules PNG; classes/packages as PNG + Mermaid + PlantUML) into diagrams/
     deps:
       - diagram
       - diagram-uml
+      - diagram-uml-mmd
+      - diagram-uml-puml
