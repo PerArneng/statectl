@@ -40,10 +40,11 @@ Repo uses the **`src/` layout** — the importable package lives at `src/statect
 - Type hints on every signature and class attribute. `assess_state()` is read-only; side effects go in `transition()` / `rollback()`.
 - **`@override` on every method that overrides an ABC/parent method** (`from typing import override`). Pyrefly is configured with the **strict** preset and rejects unannotated overrides.
 - **Run `task check` after completing a plan** (and periodically during longer work) to type-check the project with pyrefly (strict). Fix any errors before reporting the task as done.
+- **Run `task complexity` to check cyclomatic complexity** (ruff `C901`, max-complexity = 10). Fix any violations before reporting the task as done.
 
 ## Work tracking
 
-Work is driven by **GitHub Issues** on `PerArneng/statectl`, organized on a Project v2 Kanban board (`Todo` → `In Progress` → `Done`) at https://github.com/users/PerArneng/projects/1. The roadmap (`docs/roadmap.md`) is the source of truth for what to build; each item there has a matching issue with `tier-N` and `kind:*` labels. Before starting code, move the card to `In Progress` and link a branch; on merge, `Closes #N` in the PR moves it to `Done`. **Every commit must reference its issue number** (e.g. `Add FileSystem.chmod (#1)`) so commits show up on the issue timeline. For the full workflow (URLs, GraphQL mutations, branch naming) → invoke the `github-task-workflow` skill.
+Work is driven by **GitHub Issues** on `PerArneng/statectl`, organized on a Project v2 Kanban board (`Todo` → `In Progress` → `Done`) at https://github.com/users/PerArneng/projects/1. Issues carry `tier-N` and `kind:*` labels. Before starting code, move the card to `In Progress` and link a branch; on merge, `Closes #N` in the PR moves it to `Done`. **Every commit must reference its issue number** (e.g. `Add FileSystem.chmod (#1)`) so commits show up on the issue timeline. For the full workflow (URLs, GraphQL mutations, branch naming) → invoke the `github-task-workflow` skill.
 
 ## Task-specific guides
 

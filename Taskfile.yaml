@@ -6,6 +6,11 @@ tasks:
     cmds:
       - uv run pyrefly check
 
+  complexity:
+    desc: Check cyclomatic complexity (McCabe C901, max=10) with ruff
+    cmds:
+      - uv run ruff check src/statectl
+
   diagram:
     desc: Module-dependency graph of statectl (pydeps) → diagrams/statectl.png
     cmds:

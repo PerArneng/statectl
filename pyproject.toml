@@ -26,10 +26,20 @@ project-includes = [
     "src/statectl/**/*.ipynb",
 ]
 
+[tool.ruff]
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["C90"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
 [dependency-groups]
 dev = [
     "pyrefly>=1.0.0",
     "pytest>=9.0.3",
     "pydeps>=3.0",
     "pylint>=3.0",
+    "ruff>=0.15.13",
 ]
