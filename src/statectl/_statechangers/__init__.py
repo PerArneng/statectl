@@ -23,6 +23,15 @@ from .delete_path import (
     DeletePathStateChanger as DeletePathStateChanger,
     PathKind as PathKind,
 )
+from .ensure_git_repo_cloned import (
+    Branch as Branch,
+    Commit as Commit,
+    EnsureGitRepoClonedParameters as EnsureGitRepoClonedParameters,
+    EnsureGitRepoClonedRollbackStateChanger as EnsureGitRepoClonedRollbackStateChanger,
+    EnsureGitRepoClonedStateChanger as EnsureGitRepoClonedStateChanger,
+    GitRef as GitRef,
+    Tag as Tag,
+)
 from .ensure_homebrew_installed import (
     EnsureHomebrewInstalledParameters as EnsureHomebrewInstalledParameters,
     EnsureHomebrewInstalledStateChanger as EnsureHomebrewInstalledStateChanger,
@@ -85,6 +94,8 @@ __all__ = [
     "BrewTapParameters",
     "BrewTapRollbackStateChanger",
     "BrewTapStateChanger",
+    "Branch",
+    "Commit",
     "CopyFileParameters",
     "CopyFileRollbackStateChanger",
     "CopyFileStateChanger",
@@ -93,6 +104,9 @@ __all__ = [
     "EnsureDirectoryParameters",
     "EnsureDirectoryRollbackStateChanger",
     "EnsureDirectoryStateChanger",
+    "EnsureGitRepoClonedParameters",
+    "EnsureGitRepoClonedRollbackStateChanger",
+    "EnsureGitRepoClonedStateChanger",
     "EnsureHomebrewInstalledParameters",
     "EnsureHomebrewInstalledStateChanger",
     "EnsureLineInFileParameters",
@@ -101,6 +115,7 @@ __all__ = [
     "EnsureSymlinkParameters",
     "EnsureSymlinkRollbackStateChanger",
     "EnsureSymlinkStateChanger",
+    "GitRef",
     "NewTextFileParameters",
     "NewTextFileRollbackStateChanger",
     "NewTextFileStateChanger",
@@ -118,4 +133,5 @@ __all__ = [
     "SetFileModeRollbackStateChanger",
     "SetFileModeStateChanger",
     "StateChangers",
+    "Tag",
 ]
