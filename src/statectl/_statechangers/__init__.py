@@ -18,6 +18,14 @@ from .new_text_file import (
     NewTextFileRollbackStateChanger as NewTextFileRollbackStateChanger,
     NewTextFileStateChanger as NewTextFileStateChanger,
 )
+from .replace_in_file import (
+    LiteralMatch as LiteralMatch,
+    Match as Match,
+    RegexMatch as RegexMatch,
+    ReplaceInFileParameters as ReplaceInFileParameters,
+    ReplaceInFileRollbackStateChanger as ReplaceInFileRollbackStateChanger,
+    ReplaceInFileStateChanger as ReplaceInFileStateChanger,
+)
 from .run_command import (
     RunCommandParameters as RunCommandParameters,
     RunCommandStateChanger as RunCommandStateChanger,
@@ -38,7 +46,13 @@ __all__ = [
     "NewTextFileParameters",
     "NewTextFileRollbackStateChanger",
     "NewTextFileStateChanger",
+    "LiteralMatch",
+    "Match",
     "Placement",
+    "RegexMatch",
+    "ReplaceInFileParameters",
+    "ReplaceInFileRollbackStateChanger",
+    "ReplaceInFileStateChanger",
     "RunCommandParameters",
     "RunCommandStateChanger",
     "StateChangers",
