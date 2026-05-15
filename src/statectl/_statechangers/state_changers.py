@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import shlex
+from datetime import timedelta
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
+from statectl._interfaces.clock import Clock
 from statectl._interfaces.env import Env
 from statectl._interfaces.fs import FileSystem
 from statectl._interfaces.http import HttpClient
@@ -11,6 +13,10 @@ from statectl._interfaces.process import ProcessRunner
 from statectl._statechangers.brew_cask import (
     BrewCaskParameters,
     BrewCaskStateChanger,
+)
+from statectl._statechangers.fetch_url_to_string import (
+    FetchUrlToStringParameters,
+    FetchUrlToStringStateChanger,
 )
 from statectl._statechangers.ensure_homebrew_installed import (
     EnsureHomebrewInstalledParameters,
@@ -56,11 +62,13 @@ class StateChangers:
         process_runner: ProcessRunner,
         http_client: HttpClient,
         env: Env,
+        clock: Clock,
     ) -> None:
         self._fs: FileSystem = file_system
         self._pr: ProcessRunner = process_runner
         self._http: HttpClient = http_client
         self._env: Env = env
+        self._clock: Clock = clock
 
     def brew_cask(
         self,
@@ -116,6 +124,30 @@ class StateChangers:
         return NewTextFileStateChanger(
             NewTextFileParameters(path=Path(path), text=text, encoding=encoding),
             file_system=self._fs,
+        )
+
+    def fetch_url_to_string(
+        self,
+        url: str,
+        cache_path: str | Path,
+        *,
+        max_age: timedelta | None = None,
+        headers: Mapping[str, str] | None = None,
+        encoding: str = "utf-8",
+        timeout: float | None = None,
+    ) -> FetchUrlToStringStateChanger:
+        return FetchUrlToStringStateChanger(
+            FetchUrlToStringParameters(
+                url=url,
+                cache_path=Path(cache_path),
+                max_age=max_age,
+                headers=dict(headers) if headers is not None else {},
+                encoding=encoding,
+                timeout=timeout,
+            ),
+            file_system=self._fs,
+            http_client=self._http,
+            clock=self._clock,
         )
 
     def delete_path(

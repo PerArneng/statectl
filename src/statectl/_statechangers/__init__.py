@@ -18,6 +18,11 @@ from .delete_path import (
     DeletePathStateChanger as DeletePathStateChanger,
     PathKind as PathKind,
 )
+from .fetch_url_to_string import (
+    FetchUrlToStringParameters as FetchUrlToStringParameters,
+    FetchUrlToStringRollbackStateChanger as FetchUrlToStringRollbackStateChanger,
+    FetchUrlToStringStateChanger as FetchUrlToStringStateChanger,
+)
 from .ensure_homebrew_installed import (
     EnsureHomebrewInstalledParameters as EnsureHomebrewInstalledParameters,
     EnsureHomebrewInstalledStateChanger as EnsureHomebrewInstalledStateChanger,
@@ -82,6 +87,9 @@ __all__ = [
     "EnsureDirectoryStateChanger",
     "EnsureHomebrewInstalledParameters",
     "EnsureHomebrewInstalledStateChanger",
+    "FetchUrlToStringParameters",
+    "FetchUrlToStringRollbackStateChanger",
+    "FetchUrlToStringStateChanger",
     "EnsureLineInFileParameters",
     "EnsureLineInFileRollbackStateChanger",
     "EnsureLineInFileStateChanger",

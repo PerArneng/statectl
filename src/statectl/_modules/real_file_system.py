@@ -4,6 +4,7 @@ import os
 import shutil
 import tempfile
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator, override
 
@@ -85,6 +86,14 @@ class RealFileSystem(FileSystem):
         return os.chmod in os.supports_follow_symlinks
 
     @override
+    def mtime(self, path: Path) -> datetime | None:
+        try:
+            st = os.stat(path)
+        except OSError:
+            return None
+        return datetime.fromtimestamp(st.st_mtime, tz=timezone.utc)
+
+    @override
     def read_text_file(self, path: Path, encoding: str = "utf-8") -> str:
         with _translate(path):
             return path.read_text(encoding=encoding)
@@ -93,6 +102,11 @@ class RealFileSystem(FileSystem):
     def write_text_file(self, path: Path, text: str, encoding: str = "utf-8") -> None:
         with _translate(path):
             path.write_text(text, encoding=encoding)
+
+    @override
+    def write_bytes_file(self, path: Path, data: bytes) -> None:
+        with _translate(path):
+            path.write_bytes(data)
 
     @override
     def delete_file(self, path: Path) -> None:

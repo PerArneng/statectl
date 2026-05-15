@@ -9,6 +9,7 @@ from tests.fakes.in_memory_file_system import InMemoryFileSystem
 from tests.fakes.scripted_env import ScriptedEnv
 from tests.fakes.scripted_http_client import ScriptedHttpClient
 from tests.fakes.scripted_process_runner import ScriptedProcessRunner
+from tests.fakes.scripted_clock import ScriptedClock
 
 
 def _engine(pr: ScriptedProcessRunner) -> StateCtl:
@@ -18,6 +19,7 @@ def _engine(pr: ScriptedProcessRunner) -> StateCtl:
         process_runner=pr,
         http_client=ScriptedHttpClient(),
         env=ScriptedEnv.darwin(),
+        clock=ScriptedClock(),
         variable_registry=InMemoryVariableRegistry(),
     )
 
@@ -119,6 +121,7 @@ def test_engine_runs_install_when_not_installed() -> None:
         process_runner=pr,
         http_client=ScriptedHttpClient(),
         env=ScriptedEnv.darwin(),
+        clock=ScriptedClock(),
         variable_registry=InMemoryVariableRegistry(),
     )
     engine.add(

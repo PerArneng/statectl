@@ -20,6 +20,7 @@ from statectl._execution_node import (
     ExecutionNode,
     PublishCallback,
 )
+from statectl._interfaces.clock import Clock
 from statectl._interfaces.env import Env
 from statectl._interfaces.fs import FileSystem
 from statectl._interfaces.http import HttpClient
@@ -35,6 +36,7 @@ from statectl._modules import (
     DefaultLogger,
     InMemoryVariableRegistry,
     RealArchive,
+    RealClock,
     RealEnv,
     RealFileSystem,
     RealHttpClient,
@@ -76,6 +78,7 @@ class StateCtl:
         process_runner: ProcessRunner,
         http_client: HttpClient,
         env: Env,
+        clock: Clock,
         variable_registry: VariableRegistry,
     ) -> None:
         self._logger: Logger = logger
@@ -83,6 +86,7 @@ class StateCtl:
         self._pr: ProcessRunner = process_runner
         self._http: HttpClient = http_client
         self._env: Env = env
+        self._clock: Clock = clock
         self._registry: VariableRegistry = variable_registry
         self._nodes: list[ExecutionNode] = []
         self._node_by_handle_id: dict[int, ExecutionNode] = {}
@@ -94,6 +98,7 @@ class StateCtl:
             process_runner=self._pr,
             http_client=self._http,
             env=self._env,
+            clock=self._clock,
         )
 
     def registry(self) -> VariableRegistry:
@@ -480,6 +485,7 @@ class StateCtl:
         process_runner: ProcessRunner | None = None,
         http_client: HttpClient | None = None,
         env: Env | None = None,
+        clock: Clock | None = None,
         variable_registry: VariableRegistry | None = None,
     ) -> StateCtl:
         container = _Container()
@@ -491,6 +497,8 @@ class StateCtl:
             container.http_client.override(providers.Object(http_client))
         if env is not None:
             container.env.override(providers.Object(env))
+        if clock is not None:
+            container.clock.override(providers.Object(clock))
         if variable_registry is not None:
             container.variable_registry.override(providers.Object(variable_registry))
         return container.engine()
@@ -502,6 +510,7 @@ class _Container(containers.DeclarativeContainer):
     process_runner = providers.Singleton(RealProcessRunner)
     http_client = providers.Singleton(RealHttpClient)
     env = providers.Singleton(RealEnv)
+    clock = providers.Singleton(RealClock)
     archive = providers.Singleton(RealArchive)
     variable_registry = providers.Singleton(InMemoryVariableRegistry)
     engine = providers.Singleton(
@@ -511,5 +520,6 @@ class _Container(containers.DeclarativeContainer):
         process_runner=process_runner,
         http_client=http_client,
         env=env,
+        clock=clock,
         variable_registry=variable_registry,
     )

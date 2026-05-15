@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 from statectl._interfaces.fs import (
@@ -52,6 +53,9 @@ class FailingFileSystem(FileSystem):
     def stat_mode(self, path: Path, follow_symlinks: bool = True) -> int | None:
         return self._inner.stat_mode(path, follow_symlinks=follow_symlinks)
 
+    def mtime(self, path: Path) -> datetime | None:
+        return self._inner.mtime(path)
+
     def supports_lchmod(self) -> bool:
         return self._inner.supports_lchmod()
 
@@ -62,6 +66,10 @@ class FailingFileSystem(FileSystem):
     def write_text_file(self, path: Path, text: str, encoding: str = "utf-8") -> None:
         self._maybe_fail("write_text_file", path)
         self._inner.write_text_file(path, text, encoding=encoding)
+
+    def write_bytes_file(self, path: Path, data: bytes) -> None:
+        self._maybe_fail("write_bytes_file", path)
+        self._inner.write_bytes_file(path, data)
 
     def delete_file(self, path: Path) -> None:
         self._maybe_fail("delete_file", path)

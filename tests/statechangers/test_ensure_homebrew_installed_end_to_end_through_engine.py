@@ -15,6 +15,7 @@ from tests.fakes.in_memory_file_system import InMemoryFileSystem
 from tests.fakes.scripted_env import ScriptedEnv
 from tests.fakes.scripted_http_client import ScriptedHttpClient
 from tests.fakes.scripted_process_runner import ScriptedProcessRunner
+from tests.fakes.scripted_clock import ScriptedClock
 
 
 PREFIX = Path("/opt/homebrew")
@@ -33,6 +34,7 @@ def _engine(
         process_runner=pr,
         http_client=http,
         env=env,
+        clock=ScriptedClock(),
         variable_registry=InMemoryVariableRegistry(),
     )
 

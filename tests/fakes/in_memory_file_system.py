@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 from statectl._interfaces.fs import (
@@ -18,6 +19,7 @@ from statectl._interfaces.fs import (
 _DEFAULT_DIR_MODE = 0o755
 _DEFAULT_FILE_MODE = 0o644
 _DEFAULT_LINK_MODE = 0o777
+_DEFAULT_MTIME = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
 @dataclass
@@ -29,6 +31,7 @@ class _Node:
     mode: int = _DEFAULT_FILE_MODE
     link_mode: int = _DEFAULT_LINK_MODE
     is_symlink: bool = False
+    mtime: datetime = _DEFAULT_MTIME
 
 
 @dataclass
@@ -55,6 +58,7 @@ class InMemoryFileSystem(FileSystem):
         writable: bool | None = None,
         readable_text: bool = True,
         mode: int = _DEFAULT_FILE_MODE,
+        mtime: datetime | None = None,
     ) -> None:
         parent_writable = True
         if path.parent in self._nodes:
@@ -65,6 +69,7 @@ class InMemoryFileSystem(FileSystem):
             writable=parent_writable if writable is None else writable,
             readable_text=readable_text,
             mode=mode,
+            mtime=mtime or _DEFAULT_MTIME,
         )
 
     def add_symlink(
@@ -94,6 +99,9 @@ class InMemoryFileSystem(FileSystem):
 
     def set_mode(self, path: Path, mode: int) -> None:
         self._nodes[path].mode = mode
+
+    def set_mtime(self, path: Path, mtime: datetime) -> None:
+        self._nodes[path].mtime = mtime
 
     def set_link_mode(self, path: Path, mode: int) -> None:
         self._nodes[path].link_mode = mode
@@ -134,6 +142,12 @@ class InMemoryFileSystem(FileSystem):
             return node.link_mode & 0o7777
         return node.mode & 0o7777
 
+    def mtime(self, path: Path) -> datetime | None:
+        node = self._nodes.get(path)
+        if node is None:
+            return None
+        return node.mtime
+
     def supports_lchmod(self) -> bool:
         return self.lchmod_supported
 
@@ -163,6 +177,29 @@ class InMemoryFileSystem(FileSystem):
         self._nodes[path] = _Node(
             is_dir=False,
             content=text,
+            writable=parent.writable,
+        )
+
+    def write_bytes_file(self, path: Path, data: bytes) -> None:
+        parent = self._nodes.get(path.parent)
+        if parent is None:
+            raise FsNotFound("parent directory does not exist", path=path.parent)
+        if not parent.is_dir:
+            raise FsNotADirectory("parent is not a directory", path=path.parent)
+        if not parent.writable:
+            raise FsIoError("parent directory is not writable", path=path.parent)
+        existing = self._nodes.get(path)
+        if existing is not None and existing.is_dir:
+            raise FsNotAFile("path is a directory, not a file", path=path)
+        if existing is not None and not existing.writable:
+            raise FsIoError("file is not writable", path=path)
+        try:
+            content = data.decode("utf-8")
+        except UnicodeDecodeError:
+            content = ""
+        self._nodes[path] = _Node(
+            is_dir=False,
+            content=content,
             writable=parent.writable,
         )
 

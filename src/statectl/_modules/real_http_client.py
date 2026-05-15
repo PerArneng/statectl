@@ -56,6 +56,18 @@ class RealHttpClient(HttpClient):
                 )
 
     @override
+    def get_bytes(
+        self,
+        url: str,
+        headers: Mapping[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> bytes:
+        request = urllib.request.Request(url, headers=dict(headers) if headers else {})
+        with _translate(url):
+            with urllib.request.urlopen(request, timeout=timeout) as resp:
+                return resp.read()
+
+    @override
     def download_to_file(
         self,
         url: str,
