@@ -40,6 +40,9 @@ class FailingFileSystem(FileSystem):
     def is_dir(self, path: Path) -> bool:
         return self._inner.is_dir(path)
 
+    def is_symlink(self, path: Path) -> bool:
+        return self._inner.is_symlink(path)
+
     def is_writable(self, path: Path) -> bool:
         return self._inner.is_writable(path)
 

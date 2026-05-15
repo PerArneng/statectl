@@ -54,6 +54,10 @@ class RealFileSystem(FileSystem):
         return path.is_dir()
 
     @override
+    def is_symlink(self, path: Path) -> bool:
+        return path.is_symlink()
+
+    @override
     def is_writable(self, path: Path) -> bool:
         return os.access(path, os.W_OK)
 

@@ -38,6 +38,9 @@ class FileSystem(ABC):
     def is_dir(self, path: Path) -> bool: ...
 
     @abstractmethod
+    def is_symlink(self, path: Path) -> bool: ...
+
+    @abstractmethod
     def is_writable(self, path: Path) -> bool: ...
 
     @abstractmethod
