@@ -8,6 +8,11 @@ from .brew_package import (
     BrewPackageRollbackStateChanger as BrewPackageRollbackStateChanger,
     BrewPackageStateChanger as BrewPackageStateChanger,
 )
+from .brew_tap import (
+    BrewTapParameters as BrewTapParameters,
+    BrewTapRollbackStateChanger as BrewTapRollbackStateChanger,
+    BrewTapStateChanger as BrewTapStateChanger,
+)
 from .delete_path import (
     DeletePathParameters as DeletePathParameters,
     DeletePathStateChanger as DeletePathStateChanger,
@@ -67,6 +72,9 @@ __all__ = [
     "BrewPackageParameters",
     "BrewPackageRollbackStateChanger",
     "BrewPackageStateChanger",
+    "BrewTapParameters",
+    "BrewTapRollbackStateChanger",
+    "BrewTapStateChanger",
     "DeletePathParameters",
     "DeletePathStateChanger",
     "EnsureDirectoryParameters",
