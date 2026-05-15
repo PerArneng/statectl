@@ -12,6 +12,10 @@ from statectl._statechangers.brew_cask import (
     BrewCaskParameters,
     BrewCaskStateChanger,
 )
+from statectl._statechangers.copy_file import (
+    CopyFileParameters,
+    CopyFileStateChanger,
+)
 from statectl._statechangers.ensure_homebrew_installed import (
     EnsureHomebrewInstalledParameters,
     EnsureHomebrewInstalledStateChanger,
@@ -108,6 +112,26 @@ class StateChangers:
     ) -> EnsureDirectoryStateChanger:
         return EnsureDirectoryStateChanger(
             EnsureDirectoryParameters(path=Path(path), mode=mode, parents=parents),
+            file_system=self._fs,
+        )
+
+    def copy_file(
+        self,
+        src: str | Path,
+        dest: str | Path,
+        *,
+        mode: int | None = None,
+        overwrite: bool = False,
+        preserve_mtime: bool = False,
+    ) -> CopyFileStateChanger:
+        return CopyFileStateChanger(
+            CopyFileParameters(
+                src=Path(src),
+                dest=Path(dest),
+                mode=mode,
+                overwrite=overwrite,
+                preserve_mtime=preserve_mtime,
+            ),
             file_system=self._fs,
         )
 

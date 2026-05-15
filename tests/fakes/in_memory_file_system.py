@@ -24,6 +24,7 @@ _DEFAULT_LINK_MODE = 0o777
 class _Node:
     is_dir: bool
     content: str = ""
+    binary_content: bytes | None = None
     writable: bool = True
     readable_text: bool = True
     mode: int = _DEFAULT_FILE_MODE
@@ -166,7 +167,73 @@ class InMemoryFileSystem(FileSystem):
         self._nodes[path] = _Node(
             is_dir=False,
             content=text,
+            binary_content=text.encode(encoding, errors="replace"),
             writable=parent.writable,
+        )
+
+    def read_binary_file(self, path: Path) -> bytes:
+        node = self._nodes.get(path)
+        if node is None:
+            raise FsNotFound("path not found", path=path)
+        if node.is_dir:
+            raise FsNotAFile("path is a directory, not a file", path=path)
+        if node.binary_content is not None:
+            return node.binary_content
+        return node.content.encode("utf-8", errors="replace")
+
+    def write_binary_file(self, path: Path, data: bytes) -> None:
+        parent = self._nodes.get(path.parent)
+        if parent is None:
+            raise FsNotFound("parent directory does not exist", path=path.parent)
+        if not parent.is_dir:
+            raise FsNotADirectory("parent is not a directory", path=path.parent)
+        if not parent.writable:
+            raise FsIoError("parent directory is not writable", path=path.parent)
+        existing = self._nodes.get(path)
+        if existing is not None and existing.is_dir:
+            raise FsNotAFile("path is a directory, not a file", path=path)
+        if existing is not None and not existing.writable:
+            raise FsIoError("file is not writable", path=path)
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            text = data.decode("utf-8", errors="replace")
+        self._nodes[path] = _Node(
+            is_dir=False,
+            content=text,
+            binary_content=data,
+            writable=parent.writable,
+        )
+
+    def copy_file(self, src: Path, dest: Path, preserve_mtime: bool = False) -> None:
+        src_node = self._nodes.get(src)
+        if src_node is None:
+            raise FsNotFound("source path not found", path=src)
+        if src_node.is_dir:
+            raise FsNotAFile("source is a directory, not a file", path=src)
+        parent = self._nodes.get(dest.parent)
+        if parent is None:
+            raise FsNotFound("parent directory does not exist", path=dest.parent)
+        if not parent.is_dir:
+            raise FsNotADirectory("parent is not a directory", path=dest.parent)
+        if not parent.writable:
+            raise FsIoError("parent directory is not writable", path=dest.parent)
+        existing = self._nodes.get(dest)
+        if existing is not None and existing.is_dir:
+            raise FsNotAFile("destination is a directory, not a file", path=dest)
+        if existing is not None and not existing.writable:
+            raise FsIoError("destination is not writable", path=dest)
+        self._nodes[dest] = _Node(
+            is_dir=False,
+            content=src_node.content,
+            binary_content=(
+                src_node.binary_content
+                if src_node.binary_content is not None
+                else src_node.content.encode("utf-8", errors="replace")
+            ),
+            writable=parent.writable,
+            readable_text=src_node.readable_text,
+            mode=existing.mode if existing is not None else _DEFAULT_FILE_MODE,
         )
 
     def delete_file(self, path: Path) -> None:
