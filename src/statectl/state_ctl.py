@@ -20,6 +20,7 @@ from statectl._execution_node import (
     ExecutionNode,
     PublishCallback,
 )
+from statectl._interfaces.archive import Archive
 from statectl._interfaces.env import Env
 from statectl._interfaces.fs import FileSystem
 from statectl._interfaces.http import HttpClient
@@ -76,6 +77,7 @@ class StateCtl:
         process_runner: ProcessRunner,
         http_client: HttpClient,
         env: Env,
+        archive: Archive,
         variable_registry: VariableRegistry,
     ) -> None:
         self._logger: Logger = logger
@@ -83,6 +85,7 @@ class StateCtl:
         self._pr: ProcessRunner = process_runner
         self._http: HttpClient = http_client
         self._env: Env = env
+        self._archive: Archive = archive
         self._registry: VariableRegistry = variable_registry
         self._nodes: list[ExecutionNode] = []
         self._node_by_handle_id: dict[int, ExecutionNode] = {}
@@ -94,6 +97,7 @@ class StateCtl:
             process_runner=self._pr,
             http_client=self._http,
             env=self._env,
+            archive=self._archive,
         )
 
     def registry(self) -> VariableRegistry:
@@ -480,6 +484,7 @@ class StateCtl:
         process_runner: ProcessRunner | None = None,
         http_client: HttpClient | None = None,
         env: Env | None = None,
+        archive: Archive | None = None,
         variable_registry: VariableRegistry | None = None,
     ) -> StateCtl:
         container = _Container()
@@ -491,6 +496,8 @@ class StateCtl:
             container.http_client.override(providers.Object(http_client))
         if env is not None:
             container.env.override(providers.Object(env))
+        if archive is not None:
+            container.archive.override(providers.Object(archive))
         if variable_registry is not None:
             container.variable_registry.override(providers.Object(variable_registry))
         return container.engine()
@@ -511,5 +518,6 @@ class _Container(containers.DeclarativeContainer):
         process_runner=process_runner,
         http_client=http_client,
         env=env,
+        archive=archive,
         variable_registry=variable_registry,
     )

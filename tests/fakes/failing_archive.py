@@ -36,6 +36,12 @@ class FailingArchive(Archive):
         return self._inner.detect_format(path)
 
     @override
-    def extract(self, src: Path, dest: Path, format: ArchiveFormat) -> None:
+    def extract(
+        self,
+        src: Path,
+        dest: Path,
+        format: ArchiveFormat,
+        strip_components: int = 0,
+    ) -> None:
         self._maybe_fail("extract", src)
-        self._inner.extract(src, dest, format)
+        self._inner.extract(src, dest, format, strip_components)

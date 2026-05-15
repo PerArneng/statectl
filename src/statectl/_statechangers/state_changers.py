@@ -4,6 +4,7 @@ import shlex
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
+from statectl._interfaces.archive import Archive, ArchiveFormat
 from statectl._interfaces.env import Env
 from statectl._interfaces.fs import FileSystem
 from statectl._interfaces.http import HttpClient
@@ -11,6 +12,10 @@ from statectl._interfaces.process import ProcessRunner
 from statectl._statechangers.brew_cask import (
     BrewCaskParameters,
     BrewCaskStateChanger,
+)
+from statectl._statechangers.extract_archive import (
+    ExtractArchiveParameters,
+    ExtractArchiveStateChanger,
 )
 from statectl._statechangers.ensure_homebrew_installed import (
     EnsureHomebrewInstalledParameters,
@@ -60,11 +65,13 @@ class StateChangers:
         process_runner: ProcessRunner,
         http_client: HttpClient,
         env: Env,
+        archive: Archive,
     ) -> None:
         self._fs: FileSystem = file_system
         self._pr: ProcessRunner = process_runner
         self._http: HttpClient = http_client
         self._env: Env = env
+        self._archive: Archive = archive
 
     def brew_cask(
         self,
@@ -208,6 +215,29 @@ class StateChangers:
                 follow_symlinks=follow_symlinks,
             ),
             file_system=self._fs,
+        )
+
+    def extract_archive(
+        self,
+        archive_path: str | Path,
+        dest_dir: str | Path,
+        format: ArchiveFormat,
+        sentinel_path: str | Path,
+        *,
+        create_dest: bool = True,
+        strip_components: int = 0,
+    ) -> ExtractArchiveStateChanger:
+        return ExtractArchiveStateChanger(
+            ExtractArchiveParameters(
+                archive_path=Path(archive_path),
+                dest_dir=Path(dest_dir),
+                format=format,
+                sentinel_path=Path(sentinel_path),
+                create_dest=create_dest,
+                strip_components=strip_components,
+            ),
+            file_system=self._fs,
+            archive=self._archive,
         )
 
     def run(

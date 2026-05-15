@@ -18,6 +18,10 @@ from .delete_path import (
     DeletePathStateChanger as DeletePathStateChanger,
     PathKind as PathKind,
 )
+from .extract_archive import (
+    ExtractArchiveParameters as ExtractArchiveParameters,
+    ExtractArchiveStateChanger as ExtractArchiveStateChanger,
+)
 from .ensure_homebrew_installed import (
     EnsureHomebrewInstalledParameters as EnsureHomebrewInstalledParameters,
     EnsureHomebrewInstalledStateChanger as EnsureHomebrewInstalledStateChanger,
@@ -90,6 +94,8 @@ __all__ = [
     "EnsureLineInFileParameters",
     "EnsureLineInFileRollbackStateChanger",
     "EnsureLineInFileStateChanger",
+    "ExtractArchiveParameters",
+    "ExtractArchiveStateChanger",
     "EnsureSymlinkParameters",
     "EnsureSymlinkRollbackStateChanger",
     "EnsureSymlinkStateChanger",

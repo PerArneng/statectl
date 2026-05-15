@@ -70,6 +70,15 @@ def _translate(path: Path) -> Iterator[None]:
         raise ArchiveIoError(f"io error: {e}", path=path) from e
 
 
+def _strip_path_components(name: str, strip: int) -> str | None:
+    if strip <= 0:
+        return name
+    parts = Path(name).parts
+    if len(parts) <= strip:
+        return None
+    return str(Path(*parts[strip:]))
+
+
 def _is_safe_member(member_name: str, resolved_dest: Path) -> bool:
     member_path = Path(member_name)
     if member_path.is_absolute():
@@ -90,37 +99,61 @@ class RealArchive(Archive):
         return None
 
     @override
-    def extract(self, src: Path, dest: Path, format: ArchiveFormat) -> None:
+    def extract(
+        self,
+        src: Path,
+        dest: Path,
+        format: ArchiveFormat,
+        strip_components: int = 0,
+    ) -> None:
+        if strip_components < 0:
+            raise ArchiveIoError(
+                f"strip_components must be >= 0, got {strip_components}", path=src
+            )
         if not src.exists():
             raise ArchiveNotFound("archive not found", path=src)
         if format is ArchiveFormat.ZIP:
-            self._extract_zip(src, dest)
+            self._extract_zip(src, dest, strip_components)
             return
         opener = _TAR_OPENERS.get(format)
         if opener is None:
             raise ArchiveUnsupportedFormat(
                 f"unsupported archive format: {format.value}", path=src
             )
-        self._extract_tar(src, dest, opener)
+        self._extract_tar(src, dest, opener, strip_components)
 
     def _extract_tar(
         self,
         src: Path,
         dest: Path,
         opener: "_TarOpener",
+        strip_components: int,
     ) -> None:
         with _translate(src):
             dest.mkdir(parents=True, exist_ok=True)
             resolved_dest = dest.resolve()
             with opener(src) as tf:
+                kept: list[tarfile.TarInfo] = []
                 for member in tf.getmembers():
                     if not _is_safe_member(member.name, resolved_dest):
                         raise ArchiveUnsafeEntry(
                             f"unsafe archive entry: {member.name}", path=src
                         )
-                tf.extractall(dest, filter="data")
+                    stripped = _strip_path_components(member.name, strip_components)
+                    if stripped is None:
+                        continue
+                    if member.linkname:
+                        link_stripped = _strip_path_components(
+                            member.linkname, strip_components
+                        )
+                        if link_stripped is None:
+                            continue
+                        member.linkname = link_stripped
+                    member.name = stripped
+                    kept.append(member)
+                tf.extractall(dest, members=kept, filter="data")
 
-    def _extract_zip(self, src: Path, dest: Path) -> None:
+    def _extract_zip(self, src: Path, dest: Path, strip_components: int) -> None:
         with _translate(src):
             dest.mkdir(parents=True, exist_ok=True)
             resolved_dest = dest.resolve()
@@ -130,4 +163,17 @@ class RealArchive(Archive):
                         raise ArchiveUnsafeEntry(
                             f"unsafe archive entry: {name}", path=src
                         )
-                zf.extractall(dest)
+                if strip_components == 0:
+                    zf.extractall(dest)
+                    return
+                for info in zf.infolist():
+                    stripped = _strip_path_components(info.filename, strip_components)
+                    if stripped is None:
+                        continue
+                    target = dest / stripped
+                    if info.is_dir():
+                        target.mkdir(parents=True, exist_ok=True)
+                        continue
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    with zf.open(info) as src_f, open(target, "wb") as dst_f:
+                        dst_f.write(src_f.read())
