@@ -83,6 +83,14 @@ class FailingFileSystem(FileSystem):
         self._maybe_fail("chmod", path)
         self._inner.chmod(path, mode, follow_symlinks=follow_symlinks)
 
+    def read_symlink(self, path: Path) -> Path:
+        self._maybe_fail("read_symlink", path)
+        return self._inner.read_symlink(path)
+
+    def create_symlink(self, link_path: Path, target: Path) -> None:
+        self._maybe_fail("create_symlink", link_path)
+        self._inner.create_symlink(link_path, target)
+
     def create_temp_folder(self, prefix: str | None = None) -> Path:
         self._maybe_fail("create_temp_folder", None)
         return self._inner.create_temp_folder(prefix=prefix)

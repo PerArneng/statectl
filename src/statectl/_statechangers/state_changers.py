@@ -25,6 +25,10 @@ from statectl._statechangers.ensure_directory import (
     EnsureDirectoryParameters,
     EnsureDirectoryStateChanger,
 )
+from statectl._statechangers.ensure_symlink import (
+    EnsureSymlinkParameters,
+    EnsureSymlinkStateChanger,
+)
 from statectl._statechangers.ensure_line_in_file import (
     EnsureLineInFileParameters,
     EnsureLineInFileStateChanger,
@@ -132,6 +136,24 @@ class StateChangers:
                 kind=kind,
                 recursive=recursive,
                 missing_ok=missing_ok,
+            ),
+            file_system=self._fs,
+        )
+
+    def ensure_symlink(
+        self,
+        link_path: str | Path,
+        target: str | Path,
+        *,
+        overwrite_non_symlink: bool = False,
+        allow_dangling: bool = True,
+    ) -> EnsureSymlinkStateChanger:
+        return EnsureSymlinkStateChanger(
+            EnsureSymlinkParameters(
+                link_path=Path(link_path),
+                target=Path(target),
+                overwrite_non_symlink=overwrite_non_symlink,
+                allow_dangling=allow_dangling,
             ),
             file_system=self._fs,
         )
