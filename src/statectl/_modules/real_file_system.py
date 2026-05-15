@@ -70,11 +70,19 @@ class RealFileSystem(FileSystem):
             return False
 
     @override
-    def stat_mode(self, path: Path) -> int | None:
+    def stat_mode(self, path: Path, follow_symlinks: bool = True) -> int | None:
         try:
-            return path.stat().st_mode & 0o7777
+            if follow_symlinks:
+                st = os.stat(path)
+            else:
+                st = os.lstat(path)
+            return st.st_mode & 0o7777
         except OSError:
             return None
+
+    @override
+    def supports_lchmod(self) -> bool:
+        return os.chmod in os.supports_follow_symlinks
 
     @override
     def read_text_file(self, path: Path, encoding: str = "utf-8") -> str:
@@ -113,9 +121,14 @@ class RealFileSystem(FileSystem):
                 path.rmdir()
 
     @override
-    def chmod(self, path: Path, mode: int) -> None:
+    def chmod(self, path: Path, mode: int, follow_symlinks: bool = True) -> None:
         with _translate(path):
-            path.chmod(mode)
+            if follow_symlinks:
+                os.chmod(path, mode)
+            else:
+                if os.chmod not in os.supports_follow_symlinks:
+                    raise FsIoError("lchmod not supported on this platform", path=path)
+                os.chmod(path, mode, follow_symlinks=False)
 
     @override
     def create_temp_folder(self, prefix: str | None = None) -> Path:

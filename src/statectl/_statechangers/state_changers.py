@@ -33,6 +33,10 @@ from statectl._statechangers.run_command import (
     RunCommandParameters,
     RunCommandStateChanger,
 )
+from statectl._statechangers.set_file_mode import (
+    SetFileModeParameters,
+    SetFileModeStateChanger,
+)
 
 
 class StateChangers:
@@ -117,6 +121,22 @@ class StateChangers:
                 path=Path(path),
                 match=match,
                 encoding=encoding,
+            ),
+            file_system=self._fs,
+        )
+
+    def set_file_mode(
+        self,
+        path: str | Path,
+        mode: int,
+        *,
+        follow_symlinks: bool = True,
+    ) -> SetFileModeStateChanger:
+        return SetFileModeStateChanger(
+            SetFileModeParameters(
+                path=Path(path),
+                mode=mode,
+                follow_symlinks=follow_symlinks,
             ),
             file_system=self._fs,
         )

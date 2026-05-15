@@ -31,6 +31,11 @@ from .replace_in_file import (
     ReplaceInFileRollbackStateChanger as ReplaceInFileRollbackStateChanger,
     ReplaceInFileStateChanger as ReplaceInFileStateChanger,
 )
+from .set_file_mode import (
+    SetFileModeParameters as SetFileModeParameters,
+    SetFileModeRollbackStateChanger as SetFileModeRollbackStateChanger,
+    SetFileModeStateChanger as SetFileModeStateChanger,
+)
 from .run_command import (
     RunCommandParameters as RunCommandParameters,
     RunCommandStateChanger as RunCommandStateChanger,
@@ -63,5 +68,8 @@ __all__ = [
     "ReplaceInFileStateChanger",
     "RunCommandParameters",
     "RunCommandStateChanger",
+    "SetFileModeParameters",
+    "SetFileModeRollbackStateChanger",
+    "SetFileModeStateChanger",
     "StateChangers",
 ]
