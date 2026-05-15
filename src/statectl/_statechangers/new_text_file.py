@@ -32,6 +32,10 @@ class NewTextFileStateChanger(RollbackableStateChanger):
         self._params = params
         self._fs: FileSystem = file_system or RealFileSystem()
 
+    @property
+    def params(self) -> NewTextFileParameters:
+        return self._params
+
     @override
     def name(self) -> str:
         return f"new-text-file:{self._params.path}"

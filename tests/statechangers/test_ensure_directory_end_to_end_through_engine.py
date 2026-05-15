@@ -4,7 +4,7 @@ from pathlib import Path
 
 from statectl import StateCtl
 from statectl._engine_result import NodeOutcome
-from statectl._modules import DefaultLogger
+from statectl._modules import DefaultLogger, InMemoryVariableRegistry
 from statectl._statechangers import (
     EnsureDirectoryParameters,
     EnsureDirectoryStateChanger,
@@ -18,6 +18,7 @@ def _engine(fs: InMemoryFileSystem) -> StateCtl:
         logger=DefaultLogger("test"),
         file_system=fs,
         process_runner=ScriptedProcessRunner(),
+        variable_registry=InMemoryVariableRegistry(),
     )
 
 
