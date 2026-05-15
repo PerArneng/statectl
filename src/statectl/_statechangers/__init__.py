@@ -27,6 +27,11 @@ from .ensure_directory import (
     EnsureDirectoryRollbackStateChanger as EnsureDirectoryRollbackStateChanger,
     EnsureDirectoryStateChanger as EnsureDirectoryStateChanger,
 )
+from .ensure_symlink import (
+    EnsureSymlinkParameters as EnsureSymlinkParameters,
+    EnsureSymlinkRollbackStateChanger as EnsureSymlinkRollbackStateChanger,
+    EnsureSymlinkStateChanger as EnsureSymlinkStateChanger,
+)
 from .ensure_line_in_file import (
     AfterRegex as AfterRegex,
     AtEnd as AtEnd,
@@ -85,6 +90,9 @@ __all__ = [
     "EnsureLineInFileParameters",
     "EnsureLineInFileRollbackStateChanger",
     "EnsureLineInFileStateChanger",
+    "EnsureSymlinkParameters",
+    "EnsureSymlinkRollbackStateChanger",
+    "EnsureSymlinkStateChanger",
     "NewTextFileParameters",
     "NewTextFileRollbackStateChanger",
     "NewTextFileStateChanger",

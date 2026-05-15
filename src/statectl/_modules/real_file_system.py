@@ -131,6 +131,16 @@ class RealFileSystem(FileSystem):
                 os.chmod(path, mode, follow_symlinks=False)
 
     @override
+    def read_symlink(self, path: Path) -> Path:
+        with _translate(path):
+            return Path(os.readlink(path))
+
+    @override
+    def create_symlink(self, link_path: Path, target: Path) -> None:
+        with _translate(link_path):
+            os.symlink(target, link_path)
+
+    @override
     def create_temp_folder(self, prefix: str | None = None) -> Path:
         with _translate(Path(tempfile.gettempdir())):
             return Path(tempfile.mkdtemp(prefix=prefix))

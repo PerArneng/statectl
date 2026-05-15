@@ -29,6 +29,7 @@ class _Node:
     mode: int = _DEFAULT_FILE_MODE
     link_mode: int = _DEFAULT_LINK_MODE
     is_symlink: bool = False
+    symlink_target: Path | None = None
 
 
 @dataclass
@@ -74,6 +75,7 @@ class InMemoryFileSystem(FileSystem):
         writable: bool | None = None,
         mode: int = _DEFAULT_FILE_MODE,
         link_mode: int = _DEFAULT_LINK_MODE,
+        target: Path | None = None,
     ) -> None:
         parent_writable = True
         if path.parent in self._nodes:
@@ -84,6 +86,7 @@ class InMemoryFileSystem(FileSystem):
             is_symlink=True,
             mode=mode,
             link_mode=link_mode,
+            symlink_target=target,
         )
 
     def set_writable(self, path: Path, writable: bool) -> None:
@@ -228,6 +231,33 @@ class InMemoryFileSystem(FileSystem):
                     del self._nodes[p]
         else:
             del self._nodes[path]
+
+    def read_symlink(self, path: Path) -> Path:
+        node = self._nodes.get(path)
+        if node is None:
+            raise FsNotFound("path not found", path=path)
+        if not node.is_symlink:
+            raise FsIoError("path is not a symlink", path=path)
+        if node.symlink_target is None:
+            raise FsIoError("symlink has no recorded target", path=path)
+        return node.symlink_target
+
+    def create_symlink(self, link_path: Path, target: Path) -> None:
+        parent = self._nodes.get(link_path.parent)
+        if parent is None:
+            raise FsNotFound("parent directory does not exist", path=link_path.parent)
+        if not parent.is_dir:
+            raise FsNotADirectory("parent is not a directory", path=link_path.parent)
+        if not parent.writable:
+            raise FsIoError("parent directory is not writable", path=link_path.parent)
+        if link_path in self._nodes:
+            raise FsAlreadyExists("path already exists", path=link_path)
+        self._nodes[link_path] = _Node(
+            is_dir=False,
+            writable=parent.writable,
+            is_symlink=True,
+            symlink_target=target,
+        )
 
     def create_temp_folder(self, prefix: str | None = None) -> Path:
         if self.temp_root not in self._nodes:
