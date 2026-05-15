@@ -27,6 +27,12 @@ from .ensure_homebrew_installed import (
     EnsureHomebrewInstalledParameters as EnsureHomebrewInstalledParameters,
     EnsureHomebrewInstalledStateChanger as EnsureHomebrewInstalledStateChanger,
 )
+from .ensure_launchd_agent import (
+    EnsureLaunchdAgentParameters as EnsureLaunchdAgentParameters,
+    EnsureLaunchdAgentRollbackStateChanger as EnsureLaunchdAgentRollbackStateChanger,
+    EnsureLaunchdAgentStateChanger as EnsureLaunchdAgentStateChanger,
+    Scope as LaunchdScope,
+)
 from .ensure_directory import (
     EnsureDirectoryParameters as EnsureDirectoryParameters,
     EnsureDirectoryRollbackStateChanger as EnsureDirectoryRollbackStateChanger,
@@ -95,9 +101,13 @@ __all__ = [
     "EnsureDirectoryStateChanger",
     "EnsureHomebrewInstalledParameters",
     "EnsureHomebrewInstalledStateChanger",
+    "EnsureLaunchdAgentParameters",
+    "EnsureLaunchdAgentRollbackStateChanger",
+    "EnsureLaunchdAgentStateChanger",
     "EnsureLineInFileParameters",
     "EnsureLineInFileRollbackStateChanger",
     "EnsureLineInFileStateChanger",
+    "LaunchdScope",
     "EnsureSymlinkParameters",
     "EnsureSymlinkRollbackStateChanger",
     "EnsureSymlinkStateChanger",

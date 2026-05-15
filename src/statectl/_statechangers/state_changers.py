@@ -20,6 +20,11 @@ from statectl._statechangers.ensure_homebrew_installed import (
     EnsureHomebrewInstalledParameters,
     EnsureHomebrewInstalledStateChanger,
 )
+from statectl._statechangers.ensure_launchd_agent import (
+    EnsureLaunchdAgentParameters,
+    EnsureLaunchdAgentStateChanger,
+    Scope as LaunchdScope,
+)
 from statectl._statechangers.delete_path import (
     DeletePathParameters,
     DeletePathStateChanger,
@@ -100,6 +105,28 @@ class StateChangers:
             file_system=self._fs,
             process_runner=self._pr,
             http_client=self._http,
+            env=self._env,
+        )
+
+    def ensure_launchd_agent(
+        self,
+        label: str,
+        plist_content: str,
+        scope: LaunchdScope,
+        *,
+        loaded: bool = True,
+        domain_target: str | None = None,
+    ) -> EnsureLaunchdAgentStateChanger:
+        return EnsureLaunchdAgentStateChanger(
+            EnsureLaunchdAgentParameters(
+                label=label,
+                plist_content=plist_content,
+                scope=scope,
+                loaded=loaded,
+                domain_target=domain_target,
+            ),
+            file_system=self._fs,
+            process_runner=self._pr,
             env=self._env,
         )
 
