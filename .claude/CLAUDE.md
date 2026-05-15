@@ -44,6 +44,7 @@ Repo uses the **`src/` layout** — the importable package lives at `src/statect
 - **`@override` on every method that overrides an ABC/parent method** (`from typing import override`). Pyrefly is configured with the **strict** preset and rejects unannotated overrides.
 - **Run `task check` after completing a plan** (and periodically during longer work) to type-check the project with pyrefly (strict). Fix any errors before reporting the task as done.
 - **Run `task complexity` to check cyclomatic complexity** (ruff `C901`, max-complexity = 10). Fix any violations before reporting the task as done.
+- **As part of linting (before final testing), regenerate `diagrams/packages_statectl.mmd`** via `task diagram-uml-mmd` and review it against the architecture described above. Flag any unexpected cross-package imports or layering violations (e.g. `_interfaces` depending on `_modules`, `_statechangers` bypassing `_interfaces`) and fix them before running the final tests.
 
 ## Work tracking
 
