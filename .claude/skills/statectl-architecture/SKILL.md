@@ -53,7 +53,7 @@ Three layers, with dependencies flowing strictly downward:
 
 **Wiring split — read this carefully, it's a common point of confusion:**
 
-- The **DI container** (`_Container` at the bottom of `state_ctl.py`) wires engine-internal singletons: `logger`, `filesystem`, `process_runner`, and the `engine` itself. The capabilities are threaded into the `StateCtl` constructor (`StateCtl(logger=…, file_system=…, process_runner=…)`). `StateCtl.new(file_system=…, process_runner=…)` lets tests override the providers.
+- The **DI container** (`_Container` at the bottom of `state_ctl.py`) wires engine-internal singletons: `logger`, `filesystem`, `process_runner`, `http_client`, `env`, `variable_registry`, and the `engine` itself. The capabilities are threaded into the `StateCtl` constructor (`StateCtl(logger=…, file_system=…, process_runner=…, http_client=…, env=…, variable_registry=…)`). `StateCtl.new(file_system=…, process_runner=…, http_client=…, env=…, variable_registry=…)` lets tests override any of those providers.
 - **The engine owns the capabilities and exposes them via `ctl.changers()`** → a `StateChangers` factory whose methods (`new_file`, `run`, …) flatten the `Parameters` + `StateChanger` ceremony and thread the engine's fs/process-runner through to each changer. This is the recommended driver path for built-in changers.
 - **State changers also still accept capabilities as constructor kwargs**, defaulting `None` to the real impl (e.g. `self._fs: FileSystem = file_system or RealFileSystem()`). This is the path the factory uses internally and the path drivers use when constructing a changer by hand (or when tests inject fakes per-changer).
 - **Consequence:** it is *expected and intentional* that `statechangers/*.py` imports concrete classes from `src/statectl/_modules/` for those defaults. The package-level dependency graph will show `statechangers/ → modules/` edges; these are not a layering violation, they are the ergonomic seam.
@@ -83,28 +83,41 @@ src/statectl/
 │   ├── fs/                     # FileSystem ABC + FileEntry value type + fs_errors
 │   ├── process/                # ProcessRunner ABC + ProcessResult value type + process_errors
 │   ├── archive/                # Archive ABC + archive_errors (tar/zip extraction & creation)
+│   ├── env/                    # Env ABC + Platform enum (platform / env-var / home-dir lookups)
+│   ├── http/                   # HttpClient ABC + HttpResponse + http_errors
 │   └── registry/               # VariableRegistry ABC + registry_errors (typed cross-changer outputs)
 │
 ├── _modules/                   # Concrete impls. Only place stdlib IO lives.  [internal]
 │   ├── __init__.py             # re-exports DefaultLogger, RealFileSystem, RealProcessRunner,
-│   │                           # RealArchive, InMemoryVariableRegistry
+│   │                           # RealArchive, RealEnv, RealHttpClient, InMemoryVariableRegistry
 │   ├── default_logger.py
 │   ├── real_file_system.py
 │   ├── real_process_runner.py
 │   ├── real_archive.py
+│   ├── real_env.py
+│   ├── real_http_client.py
 │   └── in_memory_variable_registry.py    # default impl; "real" enough — dict + threading.Lock
 │
 └── _statechangers/             # Concrete StateChanger implementations  [internal]
     ├── __init__.py             # re-exports all concrete changers + Parameters + value types + StateChangers
-    ├── state_changers.py       # StateChangers factory — ergonomic surface for the built-in changers
-    │                           # (new_file, ensure_directory, run, delete_path,
-    │                           #  ensure_line_in_file, replace_in_file)
+    ├── state_changers.py       # StateChangers factory — ergonomic surface for most built-in changers
+    │                           # (new_file, ensure_directory, copy_file, ensure_symlink, set_file_mode,
+    │                           #  delete_path, ensure_line_in_file, replace_in_file, run,
+    │                           #  ensure_homebrew_installed, brew_cask)
     ├── new_text_file.py        # rollbackable, single capability, content-equivalence idempotency
     ├── ensure_directory.py     # rollbackable, single capability
+    ├── ensure_symlink.py       # rollbackable, single capability
+    ├── copy_file.py            # rollbackable, single capability
+    ├── set_file_mode.py        # rollbackable, single capability
+    ├── delete_path.py          # non-rollbackable; uses PathKind discriminator
     ├── ensure_line_in_file.py  # rollbackable; uses Placement discriminated union (AtStart/AtEnd/BeforeRegex/AfterRegex)
     ├── replace_in_file.py      # rollbackable; uses Match union (LiteralMatch/RegexMatch)
-    ├── delete_path.py          # non-rollbackable; uses PathKind discriminator
-    └── run_command.py          # non-rollbackable, multi-capability, sentinel idempotency
+    ├── run_command.py          # non-rollbackable, multi-capability, sentinel idempotency
+    ├── ensure_homebrew_installed.py  # uses fs + process + http + env capabilities
+    ├── brew_cask.py            # rollbackable; uses process capability
+    ├── brew_package.py         # rollbackable; uses process capability
+    ├── brew_tap.py             # rollbackable; uses process capability
+    └── ensure_git_repo_cloned.py     # rollbackable; uses fs + process + uses GitRef union (Branch/Tag/Commit)
 
 tests/
 ├── _changer_fixtures.py        # shared ProgrammableChanger + publish_value helper used by engine-level tests
@@ -114,10 +127,17 @@ tests/
 │   ├── scripted_process_runner.py
 │   ├── failing_process_runner.py
 │   ├── scripted_archive.py
-│   └── failing_archive.py
+│   ├── failing_archive.py
+│   ├── scripted_env.py
+│   ├── failing_env.py
+│   ├── scripted_http_client.py
+│   └── failing_http_client.py
 ├── statechangers/              # Per-changer behavior tests — one file per axis
 │                               # (assess_invalid, assess_ready_and_applied, transition_success,
-│                               # transition_error_matrix, rollback, invariants, end_to_end_through_engine)
+│                               # transition_error_matrix, rollback, invariants, end_to_end_through_engine;
+│                               # plus assess_fs_errors and/or assess_capability_errors when the changer
+│                               # leans on multiple capabilities and needs a dedicated error-surface axis)
+│   └── test_state_changers_factory.py    # smoke test for the StateChangers factory methods
 ├── test_dag_engine.py          # Engine-level DAG / scheduling tests
 ├── test_engine_post_assess.py  # Engine ALREADY_APPLIED / SKIPPED handling
 ├── test_publish_hook.py        # publishes= callback behavior
@@ -209,7 +229,7 @@ These are the *only* configuration errors. **Cycles are structurally impossible*
 - **Fail-isolation:** when a node returns `FAILED_INVALID` or `FAILED_TRANSITION`, its transitive descendants are BFS-marked `BLOCKED` and never submitted. Sibling branches keep running.
 - Final `EngineResult.ok` is False iff any node ended in a failure or blocked state.
 
-`StateCtl.new()` is the recommended construction path — it uses the `_Container` and wires the real logger, filesystem, and process runner. For tests, `StateCtl.new(file_system=fake_fs, process_runner=fake_pr)` overrides the providers so the engine (and any changer obtained via `ctl.changers()`) sees the fakes.
+`StateCtl.new()` is the recommended construction path — it uses the `_Container` and wires the real logger, filesystem, process runner, HTTP client, env, and variable registry. For tests, `StateCtl.new(file_system=fake_fs, process_runner=fake_pr, http_client=fake_http, env=fake_env, variable_registry=fake_reg)` overrides whichever providers you need so the engine (and any changer obtained via `ctl.changers()`) sees the fakes.
 
 ### `StateChangers` (`src/statectl/_statechangers/state_changers.py`)
 
@@ -219,14 +239,19 @@ Ergonomic factory for the built-in changers, obtained via `ctl.changers()`. Meth
 sc = ctl.changers()
 sc.new_file("/tmp/x.txt", "hi")              # → NewTextFileStateChanger
 sc.ensure_directory("/tmp/data")             # → EnsureDirectoryStateChanger
-sc.run("ls -la")                             # → RunCommandStateChanger (shlex-split string)
-sc.run(["echo", "hi there"], creates=p)      # → RunCommandStateChanger (sequence form)
+sc.copy_file("/tmp/a", "/tmp/b")             # → CopyFileStateChanger
+sc.ensure_symlink("/tmp/link", "/tmp/a")     # → EnsureSymlinkStateChanger
+sc.set_file_mode("/tmp/a", 0o644)            # → SetFileModeStateChanger
 sc.delete_path("/tmp/junk", "file")          # → DeletePathStateChanger
 sc.ensure_line_in_file("/etc/cfg", "x", AtEnd())  # → EnsureLineInFileStateChanger
 sc.replace_in_file("/etc/cfg", LiteralMatch(...))  # → ReplaceInFileStateChanger
+sc.run("ls -la")                             # → RunCommandStateChanger (shlex-split string)
+sc.run(["echo", "hi there"], creates=p)      # → RunCommandStateChanger (sequence form)
+sc.ensure_homebrew_installed("/opt/homebrew")     # → EnsureHomebrewInstalledStateChanger
+sc.brew_cask("docker")                       # → BrewCaskStateChanger
 ```
 
-The factory surfaces every built-in changer: `new_file`, `ensure_directory`, `run`, `delete_path`, `ensure_line_in_file`, and `replace_in_file`. The discriminated-union inputs (`Placement` for `ensure_line_in_file`, `Match` for `replace_in_file`, `PathKind` for `delete_path`) are passed through as-is — the union itself is the ergonomic surface, so the factory does not try to flatten it further.
+The factory currently surfaces most built-in changers: `new_file`, `ensure_directory`, `copy_file`, `ensure_symlink`, `set_file_mode`, `delete_path`, `ensure_line_in_file`, `replace_in_file`, `run`, `ensure_homebrew_installed`, and `brew_cask`. A few recent additions (`brew_package`, `brew_tap`, `ensure_git_repo_cloned`) are still constructed by hand from their `Parameters` + `StateChanger` classes — they're available via the public re-exports, just not flattened on the factory yet. The discriminated-union inputs (`Placement` for `ensure_line_in_file`, `Match` for `replace_in_file`, `PathKind` for `delete_path`, `GitRef` for `ensure_git_repo_cloned`) are passed through as-is — the union itself is the ergonomic surface, so the factory does not try to flatten it further.
 
 Coercions at the boundary: `str | Path` paths are wrapped to `Path`; `Iterable[int]` exit codes are frozen; a string command is `shlex.split`, a sequence is taken verbatim. The factory is **not** re-exported from top-level `statectl` — the engine is the public entry point, and that direction will tighten further (hiding the concrete changer/Parameters classes too) as the library matures.
 
@@ -243,7 +268,16 @@ This is how data flows between changers without coupling them: upstream publishe
 
 ### `Archive` (`src/statectl/_interfaces/archive/`)
 
-Capability for archive extraction/creation (tar, zip). ABC + typed errors in `_interfaces/archive/`, real impl `RealArchive` in `_modules/real_archive.py`, fakes `ScriptedArchive` + `FailingArchive` in `tests/fakes/`. Wired through `_Container` like the other capabilities; state changers that need archive operations accept `archive: Archive | None = None` and default to `RealArchive()`.
+Capability for archive extraction/creation (tar, zip). ABC + typed errors in `_interfaces/archive/`, real impl `RealArchive` in `_modules/real_archive.py`, fakes `ScriptedArchive` + `FailingArchive` in `tests/fakes/`. The capability is fully implemented and tested (`tests/test_archive.py`) but **no built-in state changer consumes it yet** — it isn't threaded through `_Container` / `StateCtl.changers()`. A future archive-using changer should accept `archive: Archive | None = None` defaulting to `RealArchive()` (same pattern as the other capabilities) and, if it wants the fake-override path, get wired into `_Container` + `StateCtl` at that time.
+
+### `Env` (`src/statectl/_interfaces/env/`) and `HttpClient` (`src/statectl/_interfaces/http/`)
+
+Two further capabilities used by changers like `EnsureHomebrewInstalledStateChanger`:
+
+- **`Env`** — platform / environment-variable / home-directory lookups. ABC at `_interfaces/env/env.py` (with a `Platform` enum value-object), real impl `RealEnv` in `_modules/real_env.py`, fakes `ScriptedEnv` + `FailingEnv` in `tests/fakes/`.
+- **`HttpClient`** — HTTP GET / download to file. ABC + `HttpResponse` value object at `_interfaces/http/http_client.py`, typed errors (`HttpNotFound`, `HttpNetworkError`, `HttpServerError`) in `http_errors.py`, real impl `RealHttpClient` in `_modules/real_http_client.py`, fakes `ScriptedHttpClient` + `FailingHttpClient` in `tests/fakes/`.
+
+Both follow the standard capability shape (ABC + typed errors + real impl + fakes) and are wired through `_Container` so `StateCtl.changers()` threads them into the relevant state changers automatically.
 
 ### `NodeOutcome` / `NodeReport` / `EngineResult` (`src/statectl/_engine_result.py`)
 
@@ -301,7 +335,9 @@ Two layers of tests, both fully in-process:
 - `InMemoryFileSystem` — dict-backed, with `add_dir` / `add_file` helpers and `set_writable` / `set_readable_text` to simulate permission failures.
 - `ScriptedProcessRunner` — register executables (`which` succeeds), register results by argv prefix, every `run` call records to `.calls`.
 - `ScriptedArchive` — register archive contents by source path; records extract/create calls.
-- `FailingFileSystem` / `FailingProcessRunner` / `FailingArchive` — every operation raises a configured error. Useful for error-matrix tests.
+- `ScriptedEnv` — configurable platform / env-var / home-dir lookups.
+- `ScriptedHttpClient` — register responses (and on-disk payloads for `download`) by URL; records every call.
+- `FailingFileSystem` / `FailingProcessRunner` / `FailingArchive` / `FailingEnv` / `FailingHttpClient` — every operation raises a configured error. Useful for error-matrix tests.
 
 **Engine-level tests** are split by concern:
 
