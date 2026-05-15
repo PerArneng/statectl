@@ -49,8 +49,11 @@ class FailingFileSystem(FileSystem):
     def is_empty_dir(self, path: Path) -> bool:
         return self._inner.is_empty_dir(path)
 
-    def stat_mode(self, path: Path) -> int | None:
-        return self._inner.stat_mode(path)
+    def stat_mode(self, path: Path, follow_symlinks: bool = True) -> int | None:
+        return self._inner.stat_mode(path, follow_symlinks=follow_symlinks)
+
+    def supports_lchmod(self) -> bool:
+        return self._inner.supports_lchmod()
 
     def read_text_file(self, path: Path, encoding: str = "utf-8") -> str:
         self._maybe_fail("read_text_file", path)
@@ -76,9 +79,9 @@ class FailingFileSystem(FileSystem):
         self._maybe_fail("delete_folder", path)
         self._inner.delete_folder(path, recursive=recursive)
 
-    def chmod(self, path: Path, mode: int) -> None:
+    def chmod(self, path: Path, mode: int, follow_symlinks: bool = True) -> None:
         self._maybe_fail("chmod", path)
-        self._inner.chmod(path, mode)
+        self._inner.chmod(path, mode, follow_symlinks=follow_symlinks)
 
     def create_temp_folder(self, prefix: str | None = None) -> Path:
         self._maybe_fail("create_temp_folder", None)

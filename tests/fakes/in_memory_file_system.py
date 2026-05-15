@@ -17,6 +17,7 @@ from statectl._interfaces.fs import (
 
 _DEFAULT_DIR_MODE = 0o755
 _DEFAULT_FILE_MODE = 0o644
+_DEFAULT_LINK_MODE = 0o777
 
 
 @dataclass
@@ -26,6 +27,7 @@ class _Node:
     writable: bool = True
     readable_text: bool = True
     mode: int = _DEFAULT_FILE_MODE
+    link_mode: int = _DEFAULT_LINK_MODE
     is_symlink: bool = False
 
 
@@ -41,6 +43,7 @@ class InMemoryFileSystem(FileSystem):
     _nodes: dict[Path, _Node] = field(default_factory=dict)
     _temp_counter: int = 0
     temp_root: Path = Path("/tmp")
+    lchmod_supported: bool = True
 
     def add_dir(self, path: Path, writable: bool = True, mode: int = _DEFAULT_DIR_MODE) -> None:
         self._nodes[path] = _Node(is_dir=True, writable=writable, mode=mode)
@@ -69,6 +72,8 @@ class InMemoryFileSystem(FileSystem):
         path: Path,
         target_is_dir: bool = False,
         writable: bool | None = None,
+        mode: int = _DEFAULT_FILE_MODE,
+        link_mode: int = _DEFAULT_LINK_MODE,
     ) -> None:
         parent_writable = True
         if path.parent in self._nodes:
@@ -77,6 +82,8 @@ class InMemoryFileSystem(FileSystem):
             is_dir=target_is_dir,
             writable=parent_writable if writable is None else writable,
             is_symlink=True,
+            mode=mode,
+            link_mode=link_mode,
         )
 
     def set_writable(self, path: Path, writable: bool) -> None:
@@ -87,6 +94,9 @@ class InMemoryFileSystem(FileSystem):
 
     def set_mode(self, path: Path, mode: int) -> None:
         self._nodes[path].mode = mode
+
+    def set_link_mode(self, path: Path, mode: int) -> None:
+        self._nodes[path].link_mode = mode
 
     def exists(self, path: Path) -> bool:
         return path in self._nodes
@@ -116,11 +126,16 @@ class InMemoryFileSystem(FileSystem):
                 return False
         return True
 
-    def stat_mode(self, path: Path) -> int | None:
+    def stat_mode(self, path: Path, follow_symlinks: bool = True) -> int | None:
         node = self._nodes.get(path)
         if node is None:
             return None
+        if node.is_symlink and not follow_symlinks:
+            return node.link_mode & 0o7777
         return node.mode & 0o7777
+
+    def supports_lchmod(self) -> bool:
+        return self.lchmod_supported
 
     def read_text_file(self, path: Path, encoding: str = "utf-8") -> str:
         node = self._nodes.get(path)
@@ -187,10 +202,15 @@ class InMemoryFileSystem(FileSystem):
             raise FsNotADirectory("parent is not a directory", path=path.parent)
         self._nodes[path] = _Node(is_dir=True, writable=True, mode=_DEFAULT_DIR_MODE)
 
-    def chmod(self, path: Path, mode: int) -> None:
+    def chmod(self, path: Path, mode: int, follow_symlinks: bool = True) -> None:
         node = self._nodes.get(path)
         if node is None:
             raise FsNotFound("path not found", path=path)
+        if node.is_symlink and not follow_symlinks:
+            if not self.lchmod_supported:
+                raise FsIoError("lchmod not supported", path=path)
+            node.link_mode = mode & 0o7777
+            return
         node.mode = mode & 0o7777
 
     def delete_folder(self, path: Path, recursive: bool = False) -> None:
