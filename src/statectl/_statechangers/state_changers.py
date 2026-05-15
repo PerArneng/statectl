@@ -8,6 +8,10 @@ from statectl._interfaces.env import Env
 from statectl._interfaces.fs import FileSystem
 from statectl._interfaces.http import HttpClient
 from statectl._interfaces.process import ProcessRunner
+from statectl._statechangers.brew_cask import (
+    BrewCaskParameters,
+    BrewCaskStateChanger,
+)
 from statectl._statechangers.ensure_homebrew_installed import (
     EnsureHomebrewInstalledParameters,
     EnsureHomebrewInstalledStateChanger,
@@ -57,6 +61,18 @@ class StateChangers:
         self._pr: ProcessRunner = process_runner
         self._http: HttpClient = http_client
         self._env: Env = env
+
+    def brew_cask(
+        self,
+        name: str,
+        *,
+        version: str | None = None,
+        tap: str | None = None,
+    ) -> BrewCaskStateChanger:
+        return BrewCaskStateChanger(
+            BrewCaskParameters(name=name, version=version, tap=tap),
+            process_runner=self._pr,
+        )
 
     def ensure_homebrew_installed(
         self,

@@ -1,3 +1,8 @@
+from .brew_cask import (
+    BrewCaskParameters as BrewCaskParameters,
+    BrewCaskRollbackStateChanger as BrewCaskRollbackStateChanger,
+    BrewCaskStateChanger as BrewCaskStateChanger,
+)
 from .brew_package import (
     BrewPackageParameters as BrewPackageParameters,
     BrewPackageRollbackStateChanger as BrewPackageRollbackStateChanger,
@@ -56,6 +61,9 @@ __all__ = [
     "AtEnd",
     "AtStart",
     "BeforeRegex",
+    "BrewCaskParameters",
+    "BrewCaskRollbackStateChanger",
+    "BrewCaskStateChanger",
     "BrewPackageParameters",
     "BrewPackageRollbackStateChanger",
     "BrewPackageStateChanger",
