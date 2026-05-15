@@ -1,3 +1,8 @@
+from .brew_package import (
+    BrewPackageParameters as BrewPackageParameters,
+    BrewPackageRollbackStateChanger as BrewPackageRollbackStateChanger,
+    BrewPackageStateChanger as BrewPackageStateChanger,
+)
 from .delete_path import (
     DeletePathParameters as DeletePathParameters,
     DeletePathStateChanger as DeletePathStateChanger,
@@ -51,6 +56,9 @@ __all__ = [
     "AtEnd",
     "AtStart",
     "BeforeRegex",
+    "BrewPackageParameters",
+    "BrewPackageRollbackStateChanger",
+    "BrewPackageStateChanger",
     "DeletePathParameters",
     "DeletePathStateChanger",
     "EnsureDirectoryParameters",
