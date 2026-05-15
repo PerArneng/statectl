@@ -4,8 +4,14 @@ import shlex
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
+from statectl._interfaces.env import Env
 from statectl._interfaces.fs import FileSystem
+from statectl._interfaces.http import HttpClient
 from statectl._interfaces.process import ProcessRunner
+from statectl._statechangers.ensure_homebrew_installed import (
+    EnsureHomebrewInstalledParameters,
+    EnsureHomebrewInstalledStateChanger,
+)
 from statectl._statechangers.delete_path import (
     DeletePathParameters,
     DeletePathStateChanger,
@@ -44,9 +50,34 @@ class StateChangers:
         self,
         file_system: FileSystem,
         process_runner: ProcessRunner,
+        http_client: HttpClient,
+        env: Env,
     ) -> None:
         self._fs: FileSystem = file_system
         self._pr: ProcessRunner = process_runner
+        self._http: HttpClient = http_client
+        self._env: Env = env
+
+    def ensure_homebrew_installed(
+        self,
+        brew_prefix: str | Path,
+        *,
+        install_script_url: str = (
+            "https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh"
+        ),
+        accept_eula: bool = False,
+    ) -> EnsureHomebrewInstalledStateChanger:
+        return EnsureHomebrewInstalledStateChanger(
+            EnsureHomebrewInstalledParameters(
+                brew_prefix=Path(brew_prefix),
+                install_script_url=install_script_url,
+                accept_eula=accept_eula,
+            ),
+            file_system=self._fs,
+            process_runner=self._pr,
+            http_client=self._http,
+            env=self._env,
+        )
 
     def ensure_directory(
         self,

@@ -3,6 +3,10 @@ from .delete_path import (
     DeletePathStateChanger as DeletePathStateChanger,
     PathKind as PathKind,
 )
+from .ensure_homebrew_installed import (
+    EnsureHomebrewInstalledParameters as EnsureHomebrewInstalledParameters,
+    EnsureHomebrewInstalledStateChanger as EnsureHomebrewInstalledStateChanger,
+)
 from .ensure_directory import (
     EnsureDirectoryParameters as EnsureDirectoryParameters,
     EnsureDirectoryRollbackStateChanger as EnsureDirectoryRollbackStateChanger,
@@ -52,6 +56,8 @@ __all__ = [
     "EnsureDirectoryParameters",
     "EnsureDirectoryRollbackStateChanger",
     "EnsureDirectoryStateChanger",
+    "EnsureHomebrewInstalledParameters",
+    "EnsureHomebrewInstalledStateChanger",
     "EnsureLineInFileParameters",
     "EnsureLineInFileRollbackStateChanger",
     "EnsureLineInFileStateChanger",

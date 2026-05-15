@@ -20,7 +20,9 @@ from statectl._execution_node import (
     ExecutionNode,
     PublishCallback,
 )
+from statectl._interfaces.env import Env
 from statectl._interfaces.fs import FileSystem
+from statectl._interfaces.http import HttpClient
 from statectl._interfaces.logger import Logger
 from statectl._interfaces.process import ProcessRunner
 from statectl._interfaces.registry import (
@@ -33,7 +35,9 @@ from statectl._modules import (
     DefaultLogger,
     InMemoryVariableRegistry,
     RealArchive,
+    RealEnv,
     RealFileSystem,
+    RealHttpClient,
     RealProcessRunner,
 )
 from statectl._statechangers.state_changers import StateChangers
@@ -70,18 +74,27 @@ class StateCtl:
         logger: Logger,
         file_system: FileSystem,
         process_runner: ProcessRunner,
+        http_client: HttpClient,
+        env: Env,
         variable_registry: VariableRegistry,
     ) -> None:
         self._logger: Logger = logger
         self._fs: FileSystem = file_system
         self._pr: ProcessRunner = process_runner
+        self._http: HttpClient = http_client
+        self._env: Env = env
         self._registry: VariableRegistry = variable_registry
         self._nodes: list[ExecutionNode] = []
         self._node_by_handle_id: dict[int, ExecutionNode] = {}
         self._deferred_counter: int = 0
 
     def changers(self) -> StateChangers:
-        return StateChangers(file_system=self._fs, process_runner=self._pr)
+        return StateChangers(
+            file_system=self._fs,
+            process_runner=self._pr,
+            http_client=self._http,
+            env=self._env,
+        )
 
     def registry(self) -> VariableRegistry:
         return self._registry
@@ -465,6 +478,8 @@ class StateCtl:
     def new(
         file_system: FileSystem | None = None,
         process_runner: ProcessRunner | None = None,
+        http_client: HttpClient | None = None,
+        env: Env | None = None,
         variable_registry: VariableRegistry | None = None,
     ) -> StateCtl:
         container = _Container()
@@ -472,6 +487,10 @@ class StateCtl:
             container.filesystem.override(providers.Object(file_system))
         if process_runner is not None:
             container.process_runner.override(providers.Object(process_runner))
+        if http_client is not None:
+            container.http_client.override(providers.Object(http_client))
+        if env is not None:
+            container.env.override(providers.Object(env))
         if variable_registry is not None:
             container.variable_registry.override(providers.Object(variable_registry))
         return container.engine()
@@ -481,6 +500,8 @@ class _Container(containers.DeclarativeContainer):
     logger = providers.Singleton(DefaultLogger)
     filesystem = providers.Singleton(RealFileSystem)
     process_runner = providers.Singleton(RealProcessRunner)
+    http_client = providers.Singleton(RealHttpClient)
+    env = providers.Singleton(RealEnv)
     archive = providers.Singleton(RealArchive)
     variable_registry = providers.Singleton(InMemoryVariableRegistry)
     engine = providers.Singleton(
@@ -488,5 +509,7 @@ class _Container(containers.DeclarativeContainer):
         logger=logger,
         file_system=filesystem,
         process_runner=process_runner,
+        http_client=http_client,
+        env=env,
         variable_registry=variable_registry,
     )
