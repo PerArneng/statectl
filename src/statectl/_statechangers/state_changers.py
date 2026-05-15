@@ -6,13 +6,28 @@ from typing import Iterable, Mapping, Sequence
 
 from statectl._interfaces.fs import FileSystem
 from statectl._interfaces.process import ProcessRunner
+from statectl._statechangers.delete_path import (
+    DeletePathParameters,
+    DeletePathStateChanger,
+    PathKind,
+)
 from statectl._statechangers.ensure_directory import (
     EnsureDirectoryParameters,
     EnsureDirectoryStateChanger,
 )
+from statectl._statechangers.ensure_line_in_file import (
+    EnsureLineInFileParameters,
+    EnsureLineInFileStateChanger,
+    Placement,
+)
 from statectl._statechangers.new_text_file import (
     NewTextFileParameters,
     NewTextFileStateChanger,
+)
+from statectl._statechangers.replace_in_file import (
+    Match,
+    ReplaceInFileParameters,
+    ReplaceInFileStateChanger,
 )
 from statectl._statechangers.run_command import (
     RunCommandParameters,
@@ -49,6 +64,60 @@ class StateChangers:
     ) -> NewTextFileStateChanger:
         return NewTextFileStateChanger(
             NewTextFileParameters(path=Path(path), text=text, encoding=encoding),
+            file_system=self._fs,
+        )
+
+    def delete_path(
+        self,
+        path: str | Path,
+        kind: PathKind,
+        *,
+        recursive: bool = False,
+        missing_ok: bool = True,
+    ) -> DeletePathStateChanger:
+        return DeletePathStateChanger(
+            DeletePathParameters(
+                path=Path(path),
+                kind=kind,
+                recursive=recursive,
+                missing_ok=missing_ok,
+            ),
+            file_system=self._fs,
+        )
+
+    def ensure_line_in_file(
+        self,
+        path: str | Path,
+        line: str,
+        placement: Placement,
+        *,
+        strict_anchor: bool = True,
+        encoding: str = "utf-8",
+    ) -> EnsureLineInFileStateChanger:
+        return EnsureLineInFileStateChanger(
+            EnsureLineInFileParameters(
+                path=Path(path),
+                line=line,
+                placement=placement,
+                strict_anchor=strict_anchor,
+                encoding=encoding,
+            ),
+            file_system=self._fs,
+        )
+
+    def replace_in_file(
+        self,
+        path: str | Path,
+        match: Match,
+        *,
+        encoding: str = "utf-8",
+    ) -> ReplaceInFileStateChanger:
+        return ReplaceInFileStateChanger(
+            ReplaceInFileParameters(
+                path=Path(path),
+                match=match,
+                encoding=encoding,
+            ),
             file_system=self._fs,
         )
 
