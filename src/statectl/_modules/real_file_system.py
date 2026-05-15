@@ -95,6 +95,24 @@ class RealFileSystem(FileSystem):
             path.write_text(text, encoding=encoding)
 
     @override
+    def read_binary_file(self, path: Path) -> bytes:
+        with _translate(path):
+            return path.read_bytes()
+
+    @override
+    def write_binary_file(self, path: Path, data: bytes) -> None:
+        with _translate(path):
+            path.write_bytes(data)
+
+    @override
+    def copy_file(self, src: Path, dest: Path, preserve_mtime: bool = False) -> None:
+        with _translate(src):
+            shutil.copyfile(src, dest)
+            if preserve_mtime:
+                st = os.stat(src)
+                os.utime(dest, ns=(st.st_atime_ns, st.st_mtime_ns))
+
+    @override
     def delete_file(self, path: Path) -> None:
         with _translate(path):
             path.unlink()

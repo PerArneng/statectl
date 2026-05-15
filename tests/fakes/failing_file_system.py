@@ -63,6 +63,18 @@ class FailingFileSystem(FileSystem):
         self._maybe_fail("write_text_file", path)
         self._inner.write_text_file(path, text, encoding=encoding)
 
+    def read_binary_file(self, path: Path) -> bytes:
+        self._maybe_fail("read_binary_file", path)
+        return self._inner.read_binary_file(path)
+
+    def write_binary_file(self, path: Path, data: bytes) -> None:
+        self._maybe_fail("write_binary_file", path)
+        self._inner.write_binary_file(path, data)
+
+    def copy_file(self, src: Path, dest: Path, preserve_mtime: bool = False) -> None:
+        self._maybe_fail("copy_file", src)
+        self._inner.copy_file(src, dest, preserve_mtime=preserve_mtime)
+
     def delete_file(self, path: Path) -> None:
         self._maybe_fail("delete_file", path)
         self._inner.delete_file(path)
