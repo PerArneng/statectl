@@ -3,6 +3,16 @@ from .ensure_directory import (
     EnsureDirectoryRollbackStateChanger as EnsureDirectoryRollbackStateChanger,
     EnsureDirectoryStateChanger as EnsureDirectoryStateChanger,
 )
+from .ensure_line_in_file import (
+    AfterRegex as AfterRegex,
+    AtEnd as AtEnd,
+    AtStart as AtStart,
+    BeforeRegex as BeforeRegex,
+    EnsureLineInFileParameters as EnsureLineInFileParameters,
+    EnsureLineInFileRollbackStateChanger as EnsureLineInFileRollbackStateChanger,
+    EnsureLineInFileStateChanger as EnsureLineInFileStateChanger,
+    Placement as Placement,
+)
 from .new_text_file import (
     NewTextFileParameters as NewTextFileParameters,
     NewTextFileRollbackStateChanger as NewTextFileRollbackStateChanger,
@@ -15,12 +25,20 @@ from .run_command import (
 from .state_changers import StateChangers as StateChangers
 
 __all__ = [
+    "AfterRegex",
+    "AtEnd",
+    "AtStart",
+    "BeforeRegex",
     "EnsureDirectoryParameters",
     "EnsureDirectoryRollbackStateChanger",
     "EnsureDirectoryStateChanger",
+    "EnsureLineInFileParameters",
+    "EnsureLineInFileRollbackStateChanger",
+    "EnsureLineInFileStateChanger",
     "NewTextFileParameters",
     "NewTextFileRollbackStateChanger",
     "NewTextFileStateChanger",
+    "Placement",
     "RunCommandParameters",
     "RunCommandStateChanger",
     "StateChangers",
