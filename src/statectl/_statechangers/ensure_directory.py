@@ -39,6 +39,10 @@ class EnsureDirectoryStateChanger(RollbackableStateChanger):
         self._params = params
         self._fs: FileSystem = file_system or RealFileSystem()
 
+    @property
+    def params(self) -> EnsureDirectoryParameters:
+        return self._params
+
     @override
     def name(self) -> str:
         return f"ensure-directory:{self._params.path}"

@@ -8,7 +8,7 @@ import pytest
 
 from statectl import NodeOutcome, StateCtl
 from statectl._engine_error import DuplicateNodeError, UnknownDependencyError
-from statectl._modules import DefaultLogger
+from statectl._modules import DefaultLogger, InMemoryVariableRegistry
 from statectl._state_changer import (
     ExistingState,
     Result,
@@ -70,6 +70,7 @@ def _engine() -> StateCtl:
         logger=DefaultLogger("test"),
         file_system=InMemoryFileSystem(),
         process_runner=ScriptedProcessRunner(),
+        variable_registry=InMemoryVariableRegistry(),
     )
 
 

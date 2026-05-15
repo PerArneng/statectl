@@ -54,6 +54,10 @@ class RunCommandStateChanger(StateChanger):
         self._pr: ProcessRunner = process_runner or RealProcessRunner()
         self._fs: FileSystem = file_system or RealFileSystem()
 
+    @property
+    def params(self) -> RunCommandParameters:
+        return self._params
+
     @override
     def name(self) -> str:
         if not self._params.argv:
