@@ -97,7 +97,8 @@ src/statectl/
 └── _statechangers/             # Concrete StateChanger implementations  [internal]
     ├── __init__.py             # re-exports all concrete changers + Parameters + value types + StateChangers
     ├── state_changers.py       # StateChangers factory — ergonomic surface for the built-in changers
-    │                           # surfaced through it (currently new_file, ensure_directory, run)
+    │                           # (new_file, ensure_directory, run, delete_path,
+    │                           #  ensure_line_in_file, replace_in_file)
     ├── new_text_file.py        # rollbackable, single capability, content-equivalence idempotency
     ├── ensure_directory.py     # rollbackable, single capability
     ├── ensure_line_in_file.py  # rollbackable; uses Placement discriminated union (AtStart/AtEnd/BeforeRegex/AfterRegex)
@@ -216,13 +217,16 @@ Ergonomic factory for the built-in changers, obtained via `ctl.changers()`. Meth
 
 ```python
 sc = ctl.changers()
-sc.new_file("/tmp/x.txt", "hi")           # → NewTextFileStateChanger
-sc.ensure_directory("/tmp/data")          # → EnsureDirectoryStateChanger
-sc.run("ls -la")                          # → RunCommandStateChanger (shlex-split string)
-sc.run(["echo", "hi there"], creates=p)  # → RunCommandStateChanger (sequence form)
+sc.new_file("/tmp/x.txt", "hi")              # → NewTextFileStateChanger
+sc.ensure_directory("/tmp/data")             # → EnsureDirectoryStateChanger
+sc.run("ls -la")                             # → RunCommandStateChanger (shlex-split string)
+sc.run(["echo", "hi there"], creates=p)      # → RunCommandStateChanger (sequence form)
+sc.delete_path("/tmp/junk", "file")          # → DeletePathStateChanger
+sc.ensure_line_in_file("/etc/cfg", "x", AtEnd())  # → EnsureLineInFileStateChanger
+sc.replace_in_file("/etc/cfg", LiteralMatch(...))  # → ReplaceInFileStateChanger
 ```
 
-The factory currently surfaces `new_file`, `ensure_directory`, and `run`. Other built-in changers (`delete_path`, `ensure_line_in_file`, `replace_in_file`) exist as classes in `_statechangers/` and can be constructed by hand against `Parameters`, but aren't yet exposed through the factory — extending it is tracked as architectural follow-up.
+The factory surfaces every built-in changer: `new_file`, `ensure_directory`, `run`, `delete_path`, `ensure_line_in_file`, and `replace_in_file`. The discriminated-union inputs (`Placement` for `ensure_line_in_file`, `Match` for `replace_in_file`, `PathKind` for `delete_path`) are passed through as-is — the union itself is the ergonomic surface, so the factory does not try to flatten it further.
 
 Coercions at the boundary: `str | Path` paths are wrapped to `Path`; `Iterable[int]` exit codes are frozen; a string command is `shlex.split`, a sequence is taken verbatim. The factory is **not** re-exported from top-level `statectl` — the engine is the public entry point, and that direction will tighten further (hiding the concrete changer/Parameters classes too) as the library matures.
 

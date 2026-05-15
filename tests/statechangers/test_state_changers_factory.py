@@ -5,9 +5,17 @@ from pathlib import Path
 from statectl import StateCtl
 from statectl._interfaces.process import ProcessResult
 from statectl._statechangers import (
+    AtEnd,
+    DeletePathParameters,
+    DeletePathStateChanger,
     EnsureDirectoryStateChanger,
+    EnsureLineInFileParameters,
+    EnsureLineInFileStateChanger,
+    LiteralMatch,
     NewTextFileRollbackStateChanger,
     NewTextFileStateChanger,
+    ReplaceInFileParameters,
+    ReplaceInFileStateChanger,
     RunCommandStateChanger,
     StateChangers,
 )
@@ -114,3 +122,106 @@ def test_run_creates_hint_marks_already_applied() -> None:
     engine.start(max_workers=1)
 
     assert pr.calls == []
+
+
+def test_delete_path_returns_changer_with_params() -> None:
+    fs = InMemoryFileSystem()
+    fs.add_dir(Path("/work"))
+    fs.add_file(Path("/work/junk"), content="x")
+    pr = ScriptedProcessRunner()
+    engine = StateCtl.new(file_system=fs, process_runner=pr)
+
+    changer = engine.changers().delete_path("/work/junk", "file")
+    assert isinstance(changer, DeletePathStateChanger)
+    assert isinstance(changer.params, DeletePathParameters)
+    assert changer.params.path == Path("/work/junk")
+    assert changer.params.kind == "file"
+    assert changer.params.recursive is False
+    assert changer.params.missing_ok is True
+
+    engine.add(changer)
+    engine.start(max_workers=1)
+
+    assert not fs.exists(Path("/work/junk"))
+
+
+def test_delete_path_passes_recursive_and_missing_ok() -> None:
+    fs = InMemoryFileSystem()
+    pr = ScriptedProcessRunner()
+    engine = StateCtl.new(file_system=fs, process_runner=pr)
+
+    changer = engine.changers().delete_path(
+        "/work/dir", "dir", recursive=True, missing_ok=False
+    )
+    assert changer.params.recursive is True
+    assert changer.params.missing_ok is False
+    assert changer.params.kind == "dir"
+
+
+def test_ensure_line_in_file_returns_changer_with_params() -> None:
+    fs = InMemoryFileSystem()
+    fs.add_dir(Path("/work"))
+    fs.add_file(Path("/work/cfg"), content="a\nb\n")
+    pr = ScriptedProcessRunner()
+    engine = StateCtl.new(file_system=fs, process_runner=pr)
+
+    changer = engine.changers().ensure_line_in_file(
+        "/work/cfg", "c", AtEnd()
+    )
+    assert isinstance(changer, EnsureLineInFileStateChanger)
+    assert isinstance(changer.params, EnsureLineInFileParameters)
+    assert changer.params.path == Path("/work/cfg")
+    assert changer.params.line == "c"
+    assert isinstance(changer.params.placement, AtEnd)
+    assert changer.params.strict_anchor is True
+    assert changer.params.encoding == "utf-8"
+
+    engine.add(changer)
+    engine.start(max_workers=1)
+
+    assert fs.read_text_file(Path("/work/cfg")) == "a\nb\nc\n"
+
+
+def test_ensure_line_in_file_passes_strict_anchor_and_encoding() -> None:
+    fs = InMemoryFileSystem()
+    pr = ScriptedProcessRunner()
+    engine = StateCtl.new(file_system=fs, process_runner=pr)
+
+    changer = engine.changers().ensure_line_in_file(
+        "/work/cfg", "x", AtEnd(), strict_anchor=False, encoding="latin-1"
+    )
+    assert changer.params.strict_anchor is False
+    assert changer.params.encoding == "latin-1"
+
+
+def test_replace_in_file_returns_changer_with_params() -> None:
+    fs = InMemoryFileSystem()
+    fs.add_dir(Path("/work"))
+    fs.add_file(Path("/work/cfg"), content="hello world\n")
+    pr = ScriptedProcessRunner()
+    engine = StateCtl.new(file_system=fs, process_runner=pr)
+
+    match = LiteralMatch(needle="world", expected_count=1, replacement="there")
+    changer = engine.changers().replace_in_file("/work/cfg", match)
+    assert isinstance(changer, ReplaceInFileStateChanger)
+    assert isinstance(changer.params, ReplaceInFileParameters)
+    assert changer.params.path == Path("/work/cfg")
+    assert changer.params.match is match
+    assert changer.params.encoding == "utf-8"
+
+    engine.add(changer)
+    engine.start(max_workers=1)
+
+    assert fs.read_text_file(Path("/work/cfg")) == "hello there\n"
+
+
+def test_replace_in_file_passes_encoding() -> None:
+    fs = InMemoryFileSystem()
+    pr = ScriptedProcessRunner()
+    engine = StateCtl.new(file_system=fs, process_runner=pr)
+
+    match = LiteralMatch(needle="x", expected_count=1, replacement="y")
+    changer = engine.changers().replace_in_file(
+        "/work/cfg", match, encoding="latin-1"
+    )
+    assert changer.params.encoding == "latin-1"
