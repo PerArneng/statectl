@@ -26,6 +26,7 @@ class _Node:
     writable: bool = True
     readable_text: bool = True
     mode: int = _DEFAULT_FILE_MODE
+    is_symlink: bool = False
 
 
 @dataclass
@@ -63,6 +64,21 @@ class InMemoryFileSystem(FileSystem):
             mode=mode,
         )
 
+    def add_symlink(
+        self,
+        path: Path,
+        target_is_dir: bool = False,
+        writable: bool | None = None,
+    ) -> None:
+        parent_writable = True
+        if path.parent in self._nodes:
+            parent_writable = self._nodes[path.parent].writable
+        self._nodes[path] = _Node(
+            is_dir=target_is_dir,
+            writable=parent_writable if writable is None else writable,
+            is_symlink=True,
+        )
+
     def set_writable(self, path: Path, writable: bool) -> None:
         self._nodes[path].writable = writable
 
@@ -82,6 +98,10 @@ class InMemoryFileSystem(FileSystem):
     def is_dir(self, path: Path) -> bool:
         node = self._nodes.get(path)
         return node is not None and node.is_dir
+
+    def is_symlink(self, path: Path) -> bool:
+        node = self._nodes.get(path)
+        return node is not None and node.is_symlink
 
     def is_writable(self, path: Path) -> bool:
         node = self._nodes.get(path)
@@ -135,7 +155,7 @@ class InMemoryFileSystem(FileSystem):
         node = self._nodes.get(path)
         if node is None:
             raise FsNotFound("path not found", path=path)
-        if node.is_dir:
+        if node.is_dir and not node.is_symlink:
             raise FsNotAFile("path is a directory, not a file", path=path)
         parent = self._nodes.get(path.parent)
         if parent is not None and not parent.writable:

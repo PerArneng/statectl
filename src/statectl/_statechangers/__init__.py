@@ -1,3 +1,8 @@
+from .delete_path import (
+    DeletePathParameters as DeletePathParameters,
+    DeletePathStateChanger as DeletePathStateChanger,
+    PathKind as PathKind,
+)
 from .ensure_directory import (
     EnsureDirectoryParameters as EnsureDirectoryParameters,
     EnsureDirectoryRollbackStateChanger as EnsureDirectoryRollbackStateChanger,
@@ -37,6 +42,8 @@ __all__ = [
     "AtEnd",
     "AtStart",
     "BeforeRegex",
+    "DeletePathParameters",
+    "DeletePathStateChanger",
     "EnsureDirectoryParameters",
     "EnsureDirectoryRollbackStateChanger",
     "EnsureDirectoryStateChanger",
@@ -48,6 +55,7 @@ __all__ = [
     "NewTextFileStateChanger",
     "LiteralMatch",
     "Match",
+    "PathKind",
     "Placement",
     "RegexMatch",
     "ReplaceInFileParameters",
