@@ -67,48 +67,65 @@ Repo uses the PyPA-recommended **`src/` layout** — the importable package live
 ```
 src/statectl/
 ├── py.typed                    # marks the package as typed (PEP 561)
+├── __init__.py                 # public surface — re-exports exactly: StateCtl, EngineResult, NodeReport, NodeOutcome
+│
 ├── _state_changer.py           # core ABCs + value types (StateChanger, Parameters, Result, …)  [internal]
 ├── _execution_node.py          # ExecutionNode (internal graph node — engine builds these per add())
-├── state_ctl.py                # StateCtl + private _Container  [public — re-exported]
+├── _deferred_handle.py         # DeferredHandle (opaque return type of ctl.add_deferred)
+├── state_ctl.py                # StateCtl + private _Container  [re-exported as public]
 ├── _engine_result.py           # EngineResult, NodeReport, NodeOutcome  [re-exported via __init__]
-├── _engine_error.py            # UnknownDependencyError, DuplicateNodeError (raised at add() time)
-│
-├── __init__.py                 # public surface — re-exports exactly: StateCtl, EngineResult, NodeReport, NodeOutcome
+├── _engine_error.py            # EngineConfigurationError + UnknownDependencyError, DuplicateNodeError,
+│                               # DeferredWithoutDependenciesError (raised at add()/add_deferred() time)
 │
 ├── _interfaces/                # Capability ABCs. No real IO allowed here.  [internal]
 │   ├── __init__.py             # re-exports Logger
 │   ├── logger.py
-│   ├── fs/
-│   │   ├── __init__.py         # re-exports FileSystem, FileEntry, FsError + variants
-│   │   ├── file_system.py      # the ABC + FileEntry value object (coupled, lives together)
-│   │   └── fs_errors.py        # FsError base + all variants in one file
-│   └── process/
-│       ├── __init__.py         # re-exports ProcessRunner, ProcessResult, ProcessError + variants
-│       ├── process_runner.py   # the ABC + ProcessResult value object (coupled, lives together)
-│       └── process_errors.py   # ProcessError base + all variants in one file
+│   ├── fs/                     # FileSystem ABC + FileEntry value type + fs_errors
+│   ├── process/                # ProcessRunner ABC + ProcessResult value type + process_errors
+│   ├── archive/                # Archive ABC + archive_errors (tar/zip extraction & creation)
+│   └── registry/               # VariableRegistry ABC + registry_errors (typed cross-changer outputs)
 │
 ├── _modules/                   # Concrete impls. Only place stdlib IO lives.  [internal]
-│   ├── __init__.py             # re-exports RealFileSystem, DefaultLogger, RealProcessRunner
-│   ├── real_file_system.py
+│   ├── __init__.py             # re-exports DefaultLogger, RealFileSystem, RealProcessRunner,
+│   │                           # RealArchive, InMemoryVariableRegistry
 │   ├── default_logger.py
-│   └── real_process_runner.py
+│   ├── real_file_system.py
+│   ├── real_process_runner.py
+│   ├── real_archive.py
+│   └── in_memory_variable_registry.py    # default impl; "real" enough — dict + threading.Lock
 │
 └── _statechangers/             # Concrete StateChanger implementations  [internal]
-    ├── __init__.py             # re-exports all concrete changers + Parameters + StateChangers
-    ├── state_changers.py       # StateChangers factory — ergonomic surface for built-in changers
-    ├── new_text_file.py        # rollbackable, single capability
+    ├── __init__.py             # re-exports all concrete changers + Parameters + value types + StateChangers
+    ├── state_changers.py       # StateChangers factory — ergonomic surface for the built-in changers
+    │                           # surfaced through it (currently new_file, ensure_directory, run)
+    ├── new_text_file.py        # rollbackable, single capability, content-equivalence idempotency
+    ├── ensure_directory.py     # rollbackable, single capability
+    ├── ensure_line_in_file.py  # rollbackable; uses Placement discriminated union (AtStart/AtEnd/BeforeRegex/AfterRegex)
+    ├── replace_in_file.py      # rollbackable; uses Match union (LiteralMatch/RegexMatch)
+    ├── delete_path.py          # non-rollbackable; uses PathKind discriminator
     └── run_command.py          # non-rollbackable, multi-capability, sentinel idempotency
 
 tests/
+├── _changer_fixtures.py        # shared ProgrammableChanger + publish_value helper used by engine-level tests
 ├── fakes/                      # In-memory / failing capability fakes — test-only.
 │   ├── in_memory_file_system.py
 │   ├── failing_file_system.py
 │   ├── scripted_process_runner.py
-│   └── failing_process_runner.py
-├── statechangers/              # Per-changer behavior tests
-└── test_dag_engine.py          # Engine-level DAG tests
+│   ├── failing_process_runner.py
+│   ├── scripted_archive.py
+│   └── failing_archive.py
+├── statechangers/              # Per-changer behavior tests — one file per axis
+│                               # (assess_invalid, assess_ready_and_applied, transition_success,
+│                               # transition_error_matrix, rollback, invariants, end_to_end_through_engine)
+├── test_dag_engine.py          # Engine-level DAG / scheduling tests
+├── test_engine_post_assess.py  # Engine ALREADY_APPLIED / SKIPPED handling
+├── test_publish_hook.py        # publishes= callback behavior
+├── test_variable_registry.py   # VariableRegistry capability behavior
+├── test_variable_flow.py       # End-to-end publish → consume across nodes
+├── test_add_deferred.py        # add_deferred + DeferredHandle scheduling
+└── test_archive.py             # Archive capability behavior
 
-examples/                       # PEP-723 uv scripts using the library
+examples/                       # PEP-723 uv scripts using the library — import only from `statectl`
 diagrams/                       # Generated (gitignored) — pydeps + pyreverse outputs
 ```
 
@@ -200,11 +217,29 @@ Ergonomic factory for the built-in changers, obtained via `ctl.changers()`. Meth
 ```python
 sc = ctl.changers()
 sc.new_file("/tmp/x.txt", "hi")           # → NewTextFileStateChanger
+sc.ensure_directory("/tmp/data")          # → EnsureDirectoryStateChanger
 sc.run("ls -la")                          # → RunCommandStateChanger (shlex-split string)
 sc.run(["echo", "hi there"], creates=p)  # → RunCommandStateChanger (sequence form)
 ```
 
+The factory currently surfaces `new_file`, `ensure_directory`, and `run`. Other built-in changers (`delete_path`, `ensure_line_in_file`, `replace_in_file`) exist as classes in `_statechangers/` and can be constructed by hand against `Parameters`, but aren't yet exposed through the factory — extending it is tracked as architectural follow-up.
+
 Coercions at the boundary: `str | Path` paths are wrapped to `Path`; `Iterable[int]` exit codes are frozen; a string command is `shlex.split`, a sequence is taken verbatim. The factory is **not** re-exported from top-level `statectl` — the engine is the public entry point, and that direction will tighten further (hiding the concrete changer/Parameters classes too) as the library matures.
+
+### `VariableRegistry` (`src/statectl/_interfaces/registry/`)
+
+A capability for sharing typed outputs between changers. The ABC lives at `_interfaces/registry/variable_registry.py`; the default impl `InMemoryVariableRegistry` (a `dict` guarded by `threading.Lock`) lives at `_modules/in_memory_variable_registry.py` and is wired through `_Container` like any other capability. The engine exposes its instance via `ctl.registry()`.
+
+Two driver-facing surfaces use it:
+
+- **`publishes=`** on `ctl.add(changer, depends_on=[...], publishes=lambda ch, res: {...})`. The callback runs only after `SUCCESS` / `SKIPPED_ALREADY_APPLIED` and stores its returned `Mapping[str, Any]` in the registry. Raising from the callback, or returning a duplicate name, marks the node `FAILED_TRANSITION`.
+- **`ctl.add_deferred(factory, depends_on=[...])`** schedules a changer that doesn't yet exist. The `factory(registry)` callable runs just before the node would be scheduled — all `depends_on` nodes have already completed and published. The factory's `VariableNotFoundError` / `VariableTypeError` become `FAILED_INVALID`. `add_deferred` requires a non-empty `depends_on` (else `DeferredWithoutDependenciesError` at configuration time) and returns an opaque `DeferredHandle` that is itself a valid `depends_on` target.
+
+This is how data flows between changers without coupling them: upstream publishes a typed name, downstream pulls it from the registry. The DAG edge sequences execution; the registry carries the value. See `examples/variable_registry_db_provision.py`.
+
+### `Archive` (`src/statectl/_interfaces/archive/`)
+
+Capability for archive extraction/creation (tar, zip). ABC + typed errors in `_interfaces/archive/`, real impl `RealArchive` in `_modules/real_archive.py`, fakes `ScriptedArchive` + `FailingArchive` in `tests/fakes/`. Wired through `_Container` like the other capabilities; state changers that need archive operations accept `archive: Archive | None = None` and default to `RealArchive()`.
 
 ### `NodeOutcome` / `NodeReport` / `EngineResult` (`src/statectl/_engine_result.py`)
 
@@ -257,13 +292,23 @@ These rules are non-negotiable because they preserve the layering above. Pyrefly
 
 Two layers of tests, both fully in-process:
 
-**Per-changer tests** (`tests/statechangers/`): construct a changer with fakes, exercise `assess_state` and `transition`, assert on fake state (e.g. `fs.read_text(path)`) or recorded calls (e.g. `pr.calls`). The fakes are deliberately simple:
+**Per-changer tests** (`tests/statechangers/`): construct a changer with fakes, exercise `assess_state` and `transition`, assert on fake state (e.g. `fs.read_text(path)`) or recorded calls (e.g. `pr.calls`). The convention is one file per axis per changer: `test_<changer>_assess_invalid.py`, `_assess_ready_and_applied.py`, `_transition_success.py`, `_transition_error_matrix.py`, `_rollback.py` (for rollbackables), `_invariants.py`, `_end_to_end_through_engine.py`. The fakes are deliberately simple:
 
 - `InMemoryFileSystem` — dict-backed, with `add_dir` / `add_file` helpers and `set_writable` / `set_readable_text` to simulate permission failures.
 - `ScriptedProcessRunner` — register executables (`which` succeeds), register results by argv prefix, every `run` call records to `.calls`.
-- `FailingFileSystem` / `FailingProcessRunner` — every operation raises a configured error. Useful for error-matrix tests.
+- `ScriptedArchive` — register archive contents by source path; records extract/create calls.
+- `FailingFileSystem` / `FailingProcessRunner` / `FailingArchive` — every operation raises a configured error. Useful for error-matrix tests.
 
-**Engine-level tests** (`tests/test_dag_engine.py`): construct multiple nodes, exercise the scheduler. These use a `_ProgrammableChanger` test fixture (in the same file) rather than real changers — the goal is to test *scheduling*, not state changing. Set `max_workers=1` for determinism unless you're specifically testing parallelism.
+**Engine-level tests** are split by concern:
+
+- `tests/test_dag_engine.py` — scheduling, fail-isolation, parallelism. Uses a file-local `_ProgrammableChanger`.
+- `tests/test_engine_post_assess.py` — `ALREADY_APPLIED` / `SKIPPED` handling.
+- `tests/test_publish_hook.py` — `publishes=` callback semantics.
+- `tests/test_variable_registry.py` + `tests/test_variable_flow.py` — registry capability + end-to-end publish→consume flow.
+- `tests/test_add_deferred.py` — `add_deferred` + `DeferredHandle`.
+- `tests/test_archive.py` — Archive capability.
+
+Engine tests that need a configurable test changer beyond a single file import from `tests/_changer_fixtures.py`, which exports `ProgrammableChanger` (and a `publish_value(...)` helper for `publishes=` callbacks). When adding a new engine-level test that needs a programmable changer, prefer the shared fixture over re-defining one. Set `max_workers=1` for determinism unless you're specifically testing parallelism.
 
 **Don't add a test-only side door to production code** to make testing easier. If you can't test something through the public interface, the interface is probably wrong (or you need a new capability fake). The fakes give you enough lateral surface area without compromising the production API.
 
@@ -273,6 +318,8 @@ When writing similar code, read the closest existing reference first:
 
 - `src/statectl/_statechangers/new_text_file.py` — rollbackable, single capability (FileSystem), content-equivalence idempotency (compares actual file content to desired text).
 - `src/statectl/_statechangers/run_command.py` — non-rollbackable, two capabilities (FileSystem + ProcessRunner), sentinel-based idempotency via `creates` / `removes` paths. Demonstrates the multi-capability pattern.
+- `src/statectl/_statechangers/ensure_line_in_file.py` — rollbackable; demonstrates a `Placement` discriminated union (`AtStart` / `AtEnd` / `BeforeRegex` / `AfterRegex`) for expressing where a line goes when it's missing.
+- `src/statectl/_statechangers/replace_in_file.py` — rollbackable; demonstrates a `Match` union (`LiteralMatch` / `RegexMatch`) for selecting the substring to replace.
 - `src/statectl/_interfaces/fs/` (ABC + `FileEntry` in `file_system.py`, errors in `fs_errors.py`, public surface in `__init__.py`) + `src/statectl/_modules/real_file_system.py` — the full capability shape: ABC, typed error hierarchy, real impl, `_translate()` context manager that maps stdlib exceptions to typed interface errors.
 
 ## Task-specific guides
