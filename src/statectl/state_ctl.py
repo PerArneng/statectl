@@ -32,6 +32,7 @@ from statectl._interfaces.registry import (
 from statectl._modules import (
     DefaultLogger,
     InMemoryVariableRegistry,
+    RealArchive,
     RealFileSystem,
     RealProcessRunner,
 )
@@ -480,6 +481,7 @@ class _Container(containers.DeclarativeContainer):
     logger = providers.Singleton(DefaultLogger)
     filesystem = providers.Singleton(RealFileSystem)
     process_runner = providers.Singleton(RealProcessRunner)
+    archive = providers.Singleton(RealArchive)
     variable_registry = providers.Singleton(InMemoryVariableRegistry)
     engine = providers.Singleton(
         StateCtl,
