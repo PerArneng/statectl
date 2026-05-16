@@ -1,3 +1,8 @@
+from .apt_package import (
+    AptPackageParameters as AptPackageParameters,
+    AptPackageRollbackStateChanger as AptPackageRollbackStateChanger,
+    AptPackageStateChanger as AptPackageStateChanger,
+)
 from .brew_cask import (
     BrewCaskParameters as BrewCaskParameters,
     BrewCaskRollbackStateChanger as BrewCaskRollbackStateChanger,
@@ -107,6 +112,9 @@ from .state_changers import StateChangers as StateChangers
 
 __all__ = [
     "AfterRegex",
+    "AptPackageParameters",
+    "AptPackageRollbackStateChanger",
+    "AptPackageStateChanger",
     "AtEnd",
     "AtStart",
     "BeforeRegex",
