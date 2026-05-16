@@ -5,6 +5,7 @@ from pathlib import Path
 from statectl._statechangers import (
     EnsureLaunchdAgentParameters,
     EnsureLaunchdAgentStateChanger,
+    Scope,
 )
 from tests.fakes.in_memory_file_system import InMemoryFileSystem
 from tests.fakes.scripted_env import ScriptedEnv
@@ -64,7 +65,7 @@ def make_changer(
     env: ScriptedEnv | None = None,
     label: str = DEFAULT_LABEL,
     plist_content: str | None = None,
-    scope: str = "user",
+    scope: Scope = "user",
     loaded: bool = True,
     domain_target: str | None = DEFAULT_DOMAIN,
 ) -> EnsureLaunchdAgentStateChanger:
@@ -76,7 +77,7 @@ def make_changer(
         EnsureLaunchdAgentParameters(
             label=label,
             plist_content=plist_content,
-            scope=scope,  # type: ignore[arg-type]
+            scope=scope,
             loaded=loaded,
             domain_target=domain_target,
         ),

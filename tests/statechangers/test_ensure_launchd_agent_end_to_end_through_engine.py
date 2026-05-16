@@ -3,12 +3,14 @@ from __future__ import annotations
 from statectl import StateCtl
 from statectl._engine_result import NodeOutcome
 from statectl._interfaces.process import ProcessResult
-from statectl._modules import DefaultLogger, InMemoryVariableRegistry
+from statectl._modules import DefaultLogger, InMemoryVariableRegistry, RealHashing
 from statectl._statechangers import (
     EnsureLaunchdAgentParameters,
     EnsureLaunchdAgentStateChanger,
 )
 from tests.fakes.in_memory_file_system import InMemoryFileSystem
+from tests.fakes.scripted_archive import ScriptedArchive
+from tests.fakes.scripted_clock import ScriptedClock
 from tests.fakes.scripted_env import ScriptedEnv
 from tests.fakes.scripted_http_client import ScriptedHttpClient
 from tests.fakes.scripted_process_runner import ScriptedProcessRunner
@@ -28,6 +30,9 @@ def _engine(fs: InMemoryFileSystem, pr: ScriptedProcessRunner) -> StateCtl:
         process_runner=pr,
         http_client=ScriptedHttpClient(),
         env=ScriptedEnv.darwin(home=HOME),
+        archive=ScriptedArchive(),
+        hashing=RealHashing(),
+        clock=ScriptedClock(),
         variable_registry=InMemoryVariableRegistry(),
     )
 
@@ -155,6 +160,9 @@ def test_engine_halts_on_invalid_when_platform_not_darwin() -> None:
         process_runner=pr,
         http_client=ScriptedHttpClient(),
         env=ScriptedEnv.linux(home=HOME),
+        archive=ScriptedArchive(),
+        hashing=RealHashing(),
+        clock=ScriptedClock(),
         variable_registry=InMemoryVariableRegistry(),
     )
     engine.add(changer)

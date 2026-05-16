@@ -150,6 +150,46 @@ def test_pr_with_launchctl_not_used_directly_in_invariant_check() -> None:
     assert assessment.state is ExistingState.READY
 
 
+def test_invalid_when_label_contains_path_separator() -> None:
+    # "../com.evil" trips the path-separator check on the embedded "/".
+    assessment = make_changer(label="../com.evil").assess_state()
+    assert assessment.state is ExistingState.INVALID
+    assert any("path separators" in i for i in assessment.issues)
+
+
+def test_invalid_when_label_is_dotdot() -> None:
+    assessment = make_changer(label="..").assess_state()
+    assert assessment.state is ExistingState.INVALID
+    assert any("path components" in i for i in assessment.issues)
+
+
+def test_invalid_when_label_contains_slash() -> None:
+    assessment = make_changer(label="foo/bar").assess_state()
+    assert assessment.state is ExistingState.INVALID
+    assert any("path separators" in i for i in assessment.issues)
+
+
+def test_invalid_when_label_is_empty() -> None:
+    assessment = make_changer(label="").assess_state()
+    assert assessment.state is ExistingState.INVALID
+    assert any("label is empty" in i for i in assessment.issues)
+
+
+def test_invalid_when_existing_plist_has_unparseable_label() -> None:
+    fs = make_fs_with_user_agents_dir()
+    # Well-formed XML but no Label key — we cannot identify who owns this plist.
+    unparseable = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        "<plist><dict><key>Other</key><string>value</string></dict></plist>\n"
+    )
+    fs.add_file(USER_AGENTS_DIR / f"{DEFAULT_LABEL}.plist", content=unparseable)
+    assessment = make_changer(fs=fs).assess_state()
+    assert assessment.state is ExistingState.INVALID
+    assert any(
+        "no parseable Label" in i or "unknown plist" in i for i in assessment.issues
+    )
+
+
 def test_make_pr_helper_is_usable() -> None:
     assert make_pr_with_launchctl().which("launchctl") is not None
     assert make_env_darwin().platform() == "darwin"

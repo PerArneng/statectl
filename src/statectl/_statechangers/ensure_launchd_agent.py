@@ -33,6 +33,67 @@ Scope = Literal["user", "system"]
 _USER_LAUNCH_AGENTS_REL: str = "Library/LaunchAgents"
 _SYSTEM_LAUNCH_DAEMONS: Path = Path("/Library/LaunchDaemons")
 _OUTPUT_CAP: int = 4096
+_LABEL_FORBIDDEN_CHARS: frozenset[str] = frozenset("/\\\0")
+
+
+def _label_validation_issue(label: str) -> str | None:
+    if not label:
+        return "label is empty"
+    if any(c in _LABEL_FORBIDDEN_CHARS for c in label):
+        return f"label must not contain path separators or NUL: {label!r}"
+    if label in (".", "..") or ".." in label.split("."):
+        return f"label must not contain '..' path components: {label!r}"
+    return None
+
+
+@dataclass(frozen=True)
+class _LaunchdPaths:
+    """Domain logic shared between the forward and rollback changers: where
+    the plist lives on disk and what `launchctl` calls it. Built from the
+    parameters + Env once; both changers ask it the same questions."""
+
+    plist_dir: Path
+    plist_path: Path
+    domain_target: str | None  # None when scope=user and no domain_target was given
+    service_target: str | None  # f"{domain_target}/{label}" when domain_target is set
+
+    @classmethod
+    def build(cls, params: "EnsureLaunchdAgentParameters", env: Env) -> "_LaunchdPaths":
+        if params.scope == "system":
+            plist_dir = _SYSTEM_LAUNCH_DAEMONS
+        else:
+            plist_dir = env.user_home() / _USER_LAUNCH_AGENTS_REL
+        plist_path = plist_dir / f"{params.label}.plist"
+
+        if params.domain_target is not None:
+            domain = params.domain_target
+        elif params.scope == "system":
+            domain = "system"
+        else:
+            domain = None
+
+        service = f"{domain}/{params.label}" if domain is not None else None
+        return cls(
+            plist_dir=plist_dir,
+            plist_path=plist_path,
+            domain_target=domain,
+            service_target=service,
+        )
+
+
+def _is_loaded(pr: ProcessRunner, service_target: str | None) -> bool:
+    if service_target is None:
+        return False
+    try:
+        result = pr.run(("launchctl", "print", service_target))
+    except (
+        ProcessNotFound,
+        ProcessTimeout,
+        ProcessDecodeError,
+        ProcessLaunchError,
+    ):
+        return False
+    return result.exit_code == 0
 
 
 def _truncate(text: str) -> str:
@@ -95,46 +156,11 @@ class EnsureLaunchdAgentStateChanger(RollbackableStateChanger):
         self._fs: FileSystem = file_system or RealFileSystem()
         self._pr: ProcessRunner = process_runner or RealProcessRunner()
         self._env: Env = env or RealEnv()
+        self._paths: _LaunchdPaths = _LaunchdPaths.build(params, self._env)
 
     @property
     def params(self) -> EnsureLaunchdAgentParameters:
         return self._params
-
-    def _plist_dir(self) -> Path:
-        if self._params.scope == "system":
-            return _SYSTEM_LAUNCH_DAEMONS
-        return self._env.user_home() / _USER_LAUNCH_AGENTS_REL
-
-    def _plist_path(self) -> Path:
-        return self._plist_dir() / f"{self._params.label}.plist"
-
-    def _effective_domain_target(self) -> str | None:
-        if self._params.domain_target is not None:
-            return self._params.domain_target
-        if self._params.scope == "system":
-            return "system"
-        return None
-
-    def _service_target(self) -> str | None:
-        domain = self._effective_domain_target()
-        if domain is None:
-            return None
-        return f"{domain}/{self._params.label}"
-
-    def _is_loaded(self) -> bool:
-        service = self._service_target()
-        if service is None:
-            return False
-        try:
-            result = self._pr.run(("launchctl", "print", service))
-        except (
-            ProcessNotFound,
-            ProcessTimeout,
-            ProcessDecodeError,
-            ProcessLaunchError,
-        ):
-            return False
-        return result.exit_code == 0
 
     @override
     def name(self) -> str:
@@ -150,6 +176,10 @@ class EnsureLaunchdAgentStateChanger(RollbackableStateChanger):
         if self._pr.which("launchctl") is None:
             issues.append("launchctl not on PATH")
 
+        label_issue = _label_validation_issue(params.label)
+        if label_issue is not None:
+            issues.append(label_issue)
+
         parsed_label, parse_err = _parse_plist_label(params.plist_content)
         if parse_err is not None:
             issues.append(parse_err)
@@ -159,7 +189,7 @@ class EnsureLaunchdAgentStateChanger(RollbackableStateChanger):
                 f"params.label is {params.label!r}"
             )
 
-        if params.loaded and self._effective_domain_target() is None:
+        if params.loaded and self._paths.domain_target is None:
             issues.append(
                 "loaded=True requires explicit domain_target for scope=user "
                 "(e.g. 'gui/501')"
@@ -182,7 +212,12 @@ class EnsureLaunchdAgentStateChanger(RollbackableStateChanger):
         if existing == params.plist_content:
             return issues
         existing_label, _ = _parse_plist_label(existing)
-        if existing_label is not None and existing_label != params.label:
+        if existing_label is None:
+            issues.append(
+                f"plist at {plist_path} exists with different content and no "
+                f"parseable Label; refusing to overwrite an unknown plist"
+            )
+        elif existing_label != params.label:
             issues.append(
                 f"plist at {plist_path} belongs to a different agent "
                 f"(Label={existing_label!r}); refusing to overwrite"
@@ -210,8 +245,8 @@ class EnsureLaunchdAgentStateChanger(RollbackableStateChanger):
     @override
     def assess_state(self) -> StateAssessment:
         params = self._params
-        plist_dir = self._plist_dir()
-        plist_path = self._plist_path()
+        plist_dir = self._paths.plist_dir
+        plist_path = self._paths.plist_path
 
         issues: list[str] = self._preflight_issues()
         if self._fs.exists(plist_path):
@@ -227,7 +262,9 @@ class EnsureLaunchdAgentStateChanger(RollbackableStateChanger):
             )
 
         plist_matches = self._plist_matches_on_disk(plist_path)
-        if plist_matches and (not params.loaded or self._is_loaded()):
+        if plist_matches and (
+            not params.loaded or _is_loaded(self._pr, self._paths.service_target)
+        ):
             return StateAssessment(
                 state=ExistingState.ALREADY_APPLIED,
                 description=(
@@ -241,7 +278,7 @@ class EnsureLaunchdAgentStateChanger(RollbackableStateChanger):
         )
 
     def _write_plist(self) -> Result | None:
-        path = self._plist_path()
+        path = self._paths.plist_path
         try:
             self._fs.write_text_file(path, self._params.plist_content)
         except FsError as e:
@@ -249,14 +286,14 @@ class EnsureLaunchdAgentStateChanger(RollbackableStateChanger):
         return None
 
     def _bootstrap(self) -> Result:
-        service = self._service_target()
-        plist_path = self._plist_path()
+        service = self._paths.service_target
+        plist_path = self._paths.plist_path
         if service is None:
             return Result.failure(
                 "LAUNCHCTL_LOAD_FAILED",
                 "no domain_target resolved; cannot bootstrap",
             )
-        domain = self._effective_domain_target() or ""
+        domain = self._paths.domain_target or ""
         if not self._fs.is_file(plist_path):
             return Result.failure(
                 "PLIST_VANISHED",
@@ -322,7 +359,7 @@ class EnsureLaunchdAgentStateChanger(RollbackableStateChanger):
         if write_failure is not None:
             return write_failure
         if not self._params.loaded:
-            return Result.success(f"wrote plist {self._plist_path()}")
+            return Result.success(f"wrote plist {self._paths.plist_path}")
         return self._bootstrap()
 
     @override
@@ -347,46 +384,11 @@ class EnsureLaunchdAgentRollbackStateChanger(StateChanger):
         self._fs: FileSystem = file_system or RealFileSystem()
         self._pr: ProcessRunner = process_runner or RealProcessRunner()
         self._env: Env = env or RealEnv()
+        self._paths: _LaunchdPaths = _LaunchdPaths.build(params, self._env)
 
     @property
     def params(self) -> EnsureLaunchdAgentParameters:
         return self._params
-
-    def _plist_dir(self) -> Path:
-        if self._params.scope == "system":
-            return _SYSTEM_LAUNCH_DAEMONS
-        return self._env.user_home() / _USER_LAUNCH_AGENTS_REL
-
-    def _plist_path(self) -> Path:
-        return self._plist_dir() / f"{self._params.label}.plist"
-
-    def _effective_domain_target(self) -> str | None:
-        if self._params.domain_target is not None:
-            return self._params.domain_target
-        if self._params.scope == "system":
-            return "system"
-        return None
-
-    def _service_target(self) -> str | None:
-        domain = self._effective_domain_target()
-        if domain is None:
-            return None
-        return f"{domain}/{self._params.label}"
-
-    def _is_loaded(self) -> bool:
-        service = self._service_target()
-        if service is None:
-            return False
-        try:
-            result = self._pr.run(("launchctl", "print", service))
-        except (
-            ProcessNotFound,
-            ProcessTimeout,
-            ProcessDecodeError,
-            ProcessLaunchError,
-        ):
-            return False
-        return result.exit_code == 0
 
     @override
     def name(self) -> str:
@@ -395,7 +397,7 @@ class EnsureLaunchdAgentRollbackStateChanger(StateChanger):
     @override
     def assess_state(self) -> StateAssessment:
         params = self._params
-        plist_path = self._plist_path()
+        plist_path = self._paths.plist_path
         issues: list[str] = []
 
         if self._pr.which("launchctl") is None:
@@ -426,7 +428,7 @@ class EnsureLaunchdAgentRollbackStateChanger(StateChanger):
                 issues=issues,
             )
 
-        if not plist_exists and not self._is_loaded():
+        if not plist_exists and not _is_loaded(self._pr, self._paths.service_target):
             return StateAssessment(
                 state=ExistingState.ALREADY_APPLIED,
                 description=(
@@ -443,8 +445,8 @@ class EnsureLaunchdAgentRollbackStateChanger(StateChanger):
         """Unload the service if loaded. Returns a failure Result if bootout
         raises or both bootout/unload exit non-zero; None on success or when
         the service isn't loaded."""
-        service = self._service_target()
-        plist_path = self._plist_path()
+        service = self._paths.service_target
+        plist_path = self._paths.plist_path
         if service is None:
             # No domain known — fall back to legacy unload by plist path if
             # the file exists; otherwise skip (nothing we can do).
@@ -509,7 +511,7 @@ class EnsureLaunchdAgentRollbackStateChanger(StateChanger):
 
     @override
     def transition(self) -> Result:
-        plist_path = self._plist_path()
+        plist_path = self._paths.plist_path
         unload_failure = self._bootout()
         if unload_failure is not None:
             return unload_failure
