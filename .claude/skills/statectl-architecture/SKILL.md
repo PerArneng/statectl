@@ -53,7 +53,7 @@ Three layers, with dependencies flowing strictly downward:
 
 **Wiring split — read this carefully, it's a common point of confusion:**
 
-- The **DI container** (`_Container` at the bottom of `state_ctl.py`) wires engine-internal singletons: `logger`, `filesystem`, `process_runner`, `http_client`, `env`, `variable_registry`, and the `engine` itself. The capabilities are threaded into the `StateCtl` constructor (`StateCtl(logger=…, file_system=…, process_runner=…, http_client=…, env=…, variable_registry=…)`). `StateCtl.new(file_system=…, process_runner=…, http_client=…, env=…, variable_registry=…)` lets tests override any of those providers.
+- The **DI container** (`_Container` at the bottom of `state_ctl.py`) wires engine-internal singletons: `logger`, `filesystem`, `process_runner`, `http_client`, `env`, `hashing`, `clock`, `archive`, `variable_registry`, and the `engine` itself. The capabilities are threaded into the `StateCtl` constructor (`StateCtl(logger=…, file_system=…, process_runner=…, http_client=…, env=…, hashing=…, clock=…, archive=…, variable_registry=…)`). `StateCtl.new(file_system=…, process_runner=…, http_client=…, env=…, hashing=…, clock=…, archive=…, variable_registry=…)` lets tests override any of those providers.
 - **The engine owns the capabilities and exposes them via `ctl.changers()`** → a `StateChangers` factory whose methods (`new_file`, `run`, …) flatten the `Parameters` + `StateChanger` ceremony and thread the engine's fs/process-runner through to each changer. This is the recommended driver path for built-in changers.
 - **State changers also still accept capabilities as constructor kwargs**, defaulting `None` to the real impl (e.g. `self._fs: FileSystem = file_system or RealFileSystem()`). This is the path the factory uses internally and the path drivers use when constructing a changer by hand (or when tests inject fakes per-changer).
 - **Consequence:** it is *expected and intentional* that `statechangers/*.py` imports concrete classes from `src/statectl/_modules/` for those defaults. The package-level dependency graph will show `statechangers/ → modules/` edges; these are not a layering violation, they are the ergonomic seam.
@@ -85,25 +85,31 @@ src/statectl/
 │   ├── archive/                # Archive ABC + archive_errors (tar/zip extraction & creation)
 │   ├── env/                    # Env ABC + Platform enum (platform / env-var / home-dir lookups)
 │   ├── http/                   # HttpClient ABC + HttpResponse + http_errors
+│   ├── hashing/                # Hashing ABC + hashing_errors (sha256_file)
+│   ├── clock/                  # Clock ABC — pure query (now / monotonic); no errors file (never raises)
 │   └── registry/               # VariableRegistry ABC + registry_errors (typed cross-changer outputs)
 │
 ├── _modules/                   # Concrete impls. Only place stdlib IO lives.  [internal]
 │   ├── __init__.py             # re-exports DefaultLogger, RealFileSystem, RealProcessRunner,
-│   │                           # RealArchive, RealEnv, RealHttpClient, InMemoryVariableRegistry
+│   │                           # RealArchive, RealEnv, RealHttpClient, RealHashing, RealClock,
+│   │                           # InMemoryVariableRegistry
 │   ├── default_logger.py
 │   ├── real_file_system.py
 │   ├── real_process_runner.py
 │   ├── real_archive.py
 │   ├── real_env.py
 │   ├── real_http_client.py
+│   ├── real_hashing.py
+│   ├── real_clock.py
 │   └── in_memory_variable_registry.py    # default impl; "real" enough — dict + threading.Lock
 │
 └── _statechangers/             # Concrete StateChanger implementations  [internal]
     ├── __init__.py             # re-exports all concrete changers + Parameters + value types + StateChangers
     ├── state_changers.py       # StateChangers factory — ergonomic surface for most built-in changers
-    │                           # (new_file, ensure_directory, copy_file, ensure_symlink, set_file_mode,
-    │                           #  delete_path, ensure_line_in_file, replace_in_file, run,
-    │                           #  ensure_homebrew_installed, brew_cask)
+    │                           # (apt_update, brew_cask, ensure_homebrew_installed, ensure_directory,
+    │                           #  copy_file, new_file, delete_path, download_file, ensure_symlink,
+    │                           #  ensure_line_in_file, replace_in_file, set_file_mode,
+    │                           #  fetch_url_to_string, run, extract_archive)
     ├── new_text_file.py        # rollbackable, single capability, content-equivalence idempotency
     ├── ensure_directory.py     # rollbackable, single capability
     ├── ensure_symlink.py       # rollbackable, single capability
@@ -113,10 +119,22 @@ src/statectl/
     ├── ensure_line_in_file.py  # rollbackable; uses Placement discriminated union (AtStart/AtEnd/BeforeRegex/AfterRegex)
     ├── replace_in_file.py      # rollbackable; uses Match union (LiteralMatch/RegexMatch)
     ├── run_command.py          # non-rollbackable, multi-capability, sentinel idempotency
+    ├── download_file.py        # rollbackable; uses fs + http capabilities
+    ├── fetch_url_to_string.py  # non-rollbackable; publishes fetched body via VariableRegistry
+    ├── extract_archive.py      # rollbackable; uses fs + archive capabilities
     ├── ensure_homebrew_installed.py  # uses fs + process + http + env capabilities
     ├── brew_cask.py            # rollbackable; uses process capability
     ├── brew_package.py         # rollbackable; uses process capability
     ├── brew_tap.py             # rollbackable; uses process capability
+    ├── apt_update.py           # non-rollbackable; refreshes apt indices (process + clock)
+    ├── apt_package.py          # rollbackable; uses process capability
+    ├── apt_repository.py       # rollbackable; uses process + fs capabilities
+    ├── ensure_user.py          # rollbackable; uses process capability
+    ├── ensure_group_membership.py    # rollbackable; uses process capability
+    ├── ensure_default_shell.py       # rollbackable; uses process + fs capabilities
+    ├── ensure_systemd_unit.py        # rollbackable; uses fs + process capabilities
+    ├── ensure_launchd_agent.py       # rollbackable; uses fs + process capabilities
+    ├── ensure_service.py             # cross-platform service façade (systemd / launchd)
     └── ensure_git_repo_cloned.py     # rollbackable; uses fs + process + uses GitRef union (Branch/Tag/Commit)
 
 tests/
@@ -131,7 +149,11 @@ tests/
 │   ├── scripted_env.py
 │   ├── failing_env.py
 │   ├── scripted_http_client.py
-│   └── failing_http_client.py
+│   ├── failing_http_client.py
+│   ├── scripted_hashing.py
+│   ├── failing_hashing.py
+│   ├── scripted_clock.py
+│   └── failing_clock.py
 ├── statechangers/              # Per-changer behavior tests — one file per axis
 │                               # (assess_invalid, assess_ready_and_applied, transition_success,
 │                               # transition_error_matrix, rollback, invariants, end_to_end_through_engine;
@@ -144,7 +166,8 @@ tests/
 ├── test_variable_registry.py   # VariableRegistry capability behavior
 ├── test_variable_flow.py       # End-to-end publish → consume across nodes
 ├── test_add_deferred.py        # add_deferred + DeferredHandle scheduling
-└── test_archive.py             # Archive capability behavior
+├── test_archive.py             # Archive capability behavior
+└── test_hashing.py             # Hashing capability behavior
 
 examples/                       # PEP-723 uv scripts using the library — import only from `statectl`
 diagrams/                       # Generated (gitignored) — pydeps + pyreverse outputs
@@ -251,7 +274,7 @@ sc.ensure_homebrew_installed("/opt/homebrew")     # → EnsureHomebrewInstalledS
 sc.brew_cask("docker")                       # → BrewCaskStateChanger
 ```
 
-The factory currently surfaces most built-in changers: `new_file`, `ensure_directory`, `copy_file`, `ensure_symlink`, `set_file_mode`, `delete_path`, `ensure_line_in_file`, `replace_in_file`, `run`, `ensure_homebrew_installed`, and `brew_cask`. A few recent additions (`brew_package`, `brew_tap`, `ensure_git_repo_cloned`) are still constructed by hand from their `Parameters` + `StateChanger` classes — they're available via the public re-exports, just not flattened on the factory yet. The discriminated-union inputs (`Placement` for `ensure_line_in_file`, `Match` for `replace_in_file`, `PathKind` for `delete_path`, `GitRef` for `ensure_git_repo_cloned`) are passed through as-is — the union itself is the ergonomic surface, so the factory does not try to flatten it further.
+The factory currently surfaces a broad set of built-in changers: `new_file`, `ensure_directory`, `copy_file`, `ensure_symlink`, `set_file_mode`, `delete_path`, `ensure_line_in_file`, `replace_in_file`, `run`, `download_file`, `fetch_url_to_string`, `extract_archive`, `apt_update`, `ensure_homebrew_installed`, and `brew_cask`. Several other changers (`brew_package`, `brew_tap`, `apt_package`, `apt_repository`, `ensure_user`, `ensure_group_membership`, `ensure_default_shell`, `ensure_systemd_unit`, `ensure_launchd_agent`, `ensure_service`, `ensure_git_repo_cloned`) are still constructed by hand from their `Parameters` + `StateChanger` classes — they're available via the public re-exports, just not flattened on the factory yet. The discriminated-union inputs (`Placement` for `ensure_line_in_file`, `Match` for `replace_in_file`, `PathKind` for `delete_path`, `GitRef` for `ensure_git_repo_cloned`) are passed through as-is — the union itself is the ergonomic surface, so the factory does not try to flatten it further.
 
 Coercions at the boundary: `str | Path` paths are wrapped to `Path`; `Iterable[int]` exit codes are frozen; a string command is `shlex.split`, a sequence is taken verbatim. The factory is **not** re-exported from top-level `statectl` — the engine is the public entry point, and that direction will tighten further (hiding the concrete changer/Parameters classes too) as the library matures.
 
@@ -268,7 +291,7 @@ This is how data flows between changers without coupling them: upstream publishe
 
 ### `Archive` (`src/statectl/_interfaces/archive/`)
 
-Capability for archive extraction/creation (tar, zip). ABC + typed errors in `_interfaces/archive/`, real impl `RealArchive` in `_modules/real_archive.py`, fakes `ScriptedArchive` + `FailingArchive` in `tests/fakes/`. The capability is fully implemented and tested (`tests/test_archive.py`) but **no built-in state changer consumes it yet** — it isn't threaded through `_Container` / `StateCtl.changers()`. A future archive-using changer should accept `archive: Archive | None = None` defaulting to `RealArchive()` (same pattern as the other capabilities) and, if it wants the fake-override path, get wired into `_Container` + `StateCtl` at that time.
+Capability for archive extraction/creation (tar, zip). ABC + typed errors in `_interfaces/archive/`, real impl `RealArchive` in `_modules/real_archive.py`, fakes `ScriptedArchive` + `FailingArchive` in `tests/fakes/`. Wired through `_Container` and overridable via `StateCtl.new(archive=…)`; consumed by `ExtractArchiveStateChanger` and exposed on the factory as `sc.extract_archive(...)`.
 
 ### `Env` (`src/statectl/_interfaces/env/`) and `HttpClient` (`src/statectl/_interfaces/http/`)
 
@@ -278,6 +301,13 @@ Two further capabilities used by changers like `EnsureHomebrewInstalledStateChan
 - **`HttpClient`** — HTTP GET / download to file. ABC + `HttpResponse` value object at `_interfaces/http/http_client.py`, typed errors (`HttpNotFound`, `HttpNetworkError`, `HttpServerError`) in `http_errors.py`, real impl `RealHttpClient` in `_modules/real_http_client.py`, fakes `ScriptedHttpClient` + `FailingHttpClient` in `tests/fakes/`.
 
 Both follow the standard capability shape (ABC + typed errors + real impl + fakes) and are wired through `_Container` so `StateCtl.changers()` threads them into the relevant state changers automatically.
+
+### `Hashing` (`src/statectl/_interfaces/hashing/`) and `Clock` (`src/statectl/_interfaces/clock/`)
+
+Two more capabilities, both wired through `_Container` and overridable via `StateCtl.new(hashing=…, clock=…)`:
+
+- **`Hashing`** — content hashing. ABC at `_interfaces/hashing/hashing.py` exposes `sha256_file(path) -> str`; typed errors (`HashingError`, `HashingNotFound`, `HashingIoError`) in `hashing_errors.py`; real impl `RealHashing` in `_modules/real_hashing.py`; fakes `ScriptedHashing` + `FailingHashing` in `tests/fakes/`. Behavior covered by `tests/test_hashing.py`.
+- **`Clock`** — wall-clock and monotonic time. ABC at `_interfaces/clock/clock.py` exposes `now() -> datetime` (timezone-aware UTC) and `monotonic() -> float`. **No errors file** — Clock is a pure query capability and methods never raise; this is the documented exception to the "every capability has `<capability>_errors.py`" rule. Real impl `RealClock` in `_modules/real_clock.py`; fakes `ScriptedClock` + `FailingClock` in `tests/fakes/` (`FailingClock` is kept for symmetry even though Clock isn't expected to fail in production).
 
 ### `NodeOutcome` / `NodeReport` / `EngineResult` (`src/statectl/_engine_result.py`)
 
@@ -337,7 +367,9 @@ Two layers of tests, both fully in-process:
 - `ScriptedArchive` — register archive contents by source path; records extract/create calls.
 - `ScriptedEnv` — configurable platform / env-var / home-dir lookups.
 - `ScriptedHttpClient` — register responses (and on-disk payloads for `download`) by URL; records every call.
-- `FailingFileSystem` / `FailingProcessRunner` / `FailingArchive` / `FailingEnv` / `FailingHttpClient` — every operation raises a configured error. Useful for error-matrix tests.
+- `ScriptedHashing` — register a digest per path; records every call.
+- `ScriptedClock` — fixed `now()` value and a scriptable `monotonic()` sequence.
+- `FailingFileSystem` / `FailingProcessRunner` / `FailingArchive` / `FailingEnv` / `FailingHttpClient` / `FailingHashing` / `FailingClock` — every operation raises a configured error. Useful for error-matrix tests.
 
 **Engine-level tests** are split by concern:
 
@@ -347,6 +379,7 @@ Two layers of tests, both fully in-process:
 - `tests/test_variable_registry.py` + `tests/test_variable_flow.py` — registry capability + end-to-end publish→consume flow.
 - `tests/test_add_deferred.py` — `add_deferred` + `DeferredHandle`.
 - `tests/test_archive.py` — Archive capability.
+- `tests/test_hashing.py` — Hashing capability.
 
 Engine tests that need a configurable test changer beyond a single file import from `tests/_changer_fixtures.py`, which exports `ProgrammableChanger` (and a `publish_value(...)` helper for `publishes=` callbacks). When adding a new engine-level test that needs a programmable changer, prefer the shared fixture over re-defining one. Set `max_workers=1` for determinism unless you're specifically testing parallelism.
 
