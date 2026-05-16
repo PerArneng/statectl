@@ -219,6 +219,9 @@ class AptRepositoryStateChanger(RollbackableStateChanger):
                 description=f"apt repository {params.name} already configured",
             )
 
+        # Precondition checks run only after drift inspection. A repo that's
+        # already applied short-circuits to ALREADY_APPLIED above, so we never
+        # surface (irrelevant) write-permission issues on a no-op.
         self._check_preconditions(keyring_path, issues)
         if issues:
             return StateAssessment(
@@ -238,11 +241,7 @@ class AptRepositoryStateChanger(RollbackableStateChanger):
             return key.armored
         try:
             response = self._http.get(key.url)
-        except HttpNotFound as e:
-            return Result.failure("KEY_FETCH_FAILED", str(e))
-        except HttpServerError as e:
-            return Result.failure("KEY_FETCH_FAILED", str(e))
-        except HttpNetworkError as e:
+        except (HttpNotFound, HttpServerError, HttpNetworkError) as e:
             return Result.failure("KEY_FETCH_FAILED", str(e))
         if key.sha256 is not None:
             digest = hashlib.sha256(response.body.encode("utf-8")).hexdigest()
@@ -283,7 +282,7 @@ class AptRepositoryStateChanger(RollbackableStateChanger):
             )
         return details
 
-    def _write_armored(self, armored: str) -> Result | Path:
+    def _write_armored(self, armored: str) -> Result | tuple[Path, Path]:
         try:
             temp_dir = self._fs.create_temp_folder(prefix="statectl-apt-")
         except FsError as e:
@@ -292,24 +291,36 @@ class AptRepositoryStateChanger(RollbackableStateChanger):
         try:
             self._fs.write_text_file(armored_path, armored)
         except FsError as e:
+            self._cleanup_temp_dir(temp_dir)
             return Result.failure("WRITE_FAILED", f"failed to write armored key: {e}")
-        return armored_path
+        return temp_dir, armored_path
+
+    def _cleanup_temp_dir(self, temp_dir: Path) -> None:
+        try:
+            self._fs.delete_folder(temp_dir, recursive=True)
+        except FsError:
+            pass
 
     @override
     def transition(self) -> Result:
-        params = self._params
-        keyring_path = _resolve_keyring_path(params)
-        sources_file = _sources_file_path(params)
-        expected_fp = _normalise_fingerprint(params.signing_key.fingerprint)
-
         armored_or_failure = self._materialise_armored()
         if isinstance(armored_or_failure, Result):
             return armored_or_failure
 
-        armored_path_or_failure = self._write_armored(armored_or_failure)
-        if isinstance(armored_path_or_failure, Result):
-            return armored_path_or_failure
-        armored_path = armored_path_or_failure
+        write_outcome = self._write_armored(armored_or_failure)
+        if isinstance(write_outcome, Result):
+            return write_outcome
+        temp_dir, armored_path = write_outcome
+        try:
+            return self._apply(armored_path)
+        finally:
+            self._cleanup_temp_dir(temp_dir)
+
+    def _apply(self, armored_path: Path) -> Result:
+        params = self._params
+        keyring_path = _resolve_keyring_path(params)
+        sources_file = _sources_file_path(params)
+        expected_fp = _normalise_fingerprint(params.signing_key.fingerprint)
 
         if self._fs.exists(keyring_path):
             try:
