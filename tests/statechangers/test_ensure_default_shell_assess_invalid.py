@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import override
 
 from statectl._interfaces.process import ProcessResult
 from statectl._state_changer import ExistingState
@@ -144,6 +145,82 @@ def test_invalid_when_chsh_not_on_path() -> None:
 
     assert assess.state is ExistingState.INVALID
     assert any("chsh not on PATH" in i for i in assess.issues)
+
+
+class _RunnerWithMissingTool(ScriptedProcessRunner):
+    """ScriptedProcessRunner where one binary is runnable but missing from
+    `which` — used to isolate the precondition that the changer requires
+    the right platform tool on PATH (chsh on linux, dscl on darwin)."""
+
+    def __init__(self, hidden_from_which: str) -> None:
+        super().__init__()
+        self._hidden = hidden_from_which
+
+    @override
+    def which(self, name: str) -> Path | None:
+        if name == self._hidden:
+            return None
+        return super().which(name)
+
+
+def test_invalid_when_dscl_not_on_path_on_darwin() -> None:
+    fs = InMemoryFileSystem()
+    fs.add_dir(Path("/bin"))
+    fs.add_dir(Path("/etc"))
+    fs.add_file(Path("/bin/zsh"), mode=0o755)
+    fs.add_file(Path("/etc/shells"), content="/bin/bash\n/bin/zsh\n")
+    pr = _RunnerWithMissingTool("dscl")
+    pr.register_executable("dscl")
+    pr.register(
+        ("dscl", ".", "-read", "/Users/alice", "UserShell"),
+        ProcessResult(
+            exit_code=0,
+            stdout="UserShell: /bin/bash\n",
+            stderr="",
+            duration_ms=0,
+        ),
+    )
+    changer = EnsureDefaultShellStateChanger(
+        EnsureDefaultShellParameters(user="alice", shell=Path("/bin/zsh")),
+        process_runner=pr,
+        file_system=fs,
+        env=ScriptedEnv.darwin(),
+    )
+
+    assess = changer.assess_state()
+
+    assert assess.state is ExistingState.INVALID
+    assert any("dscl not on PATH" in i for i in assess.issues)
+
+
+def test_chsh_not_required_on_darwin() -> None:
+    # Regression guard: on darwin, chsh-on-PATH must not be a precondition.
+    fs = InMemoryFileSystem()
+    fs.add_dir(Path("/bin"))
+    fs.add_dir(Path("/etc"))
+    fs.add_file(Path("/bin/zsh"), mode=0o755)
+    fs.add_file(Path("/etc/shells"), content="/bin/bash\n/bin/zsh\n")
+    pr = ScriptedProcessRunner()
+    pr.register_executable("dscl")  # darwin's tool only — no chsh
+    pr.register(
+        ("dscl", ".", "-read", "/Users/alice", "UserShell"),
+        ProcessResult(
+            exit_code=0,
+            stdout="UserShell: /bin/bash\n",
+            stderr="",
+            duration_ms=0,
+        ),
+    )
+    changer = EnsureDefaultShellStateChanger(
+        EnsureDefaultShellParameters(user="alice", shell=Path("/bin/zsh")),
+        process_runner=pr,
+        file_system=fs,
+        env=ScriptedEnv.darwin(),
+    )
+
+    assess = changer.assess_state()
+
+    assert assess.state is ExistingState.READY
 
 
 def test_invalid_collects_multiple_issues_in_one_pass() -> None:

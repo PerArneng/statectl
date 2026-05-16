@@ -66,6 +66,7 @@ def _probe(pr: ProcessRunner, argv: tuple[str, ...]) -> ProcessResult | _ProbeEr
 
 
 def _parse_getent_shell(stdout: str) -> Path | None:
+    # `getent passwd <user>` returns exactly one row, so taking [0] is safe.
     line = stdout.strip().splitlines()[0] if stdout.strip() else ""
     if not line:
         return None
@@ -89,6 +90,10 @@ def _current_shell_argv(platform: Platform, user: str) -> tuple[str, ...]:
     if platform == "darwin":
         return ("dscl", ".", "-read", f"/Users/{user}", "UserShell")
     return ("getent", "passwd", user)
+
+
+def _required_chsh_tool(platform: Platform) -> str:
+    return "dscl" if platform == "darwin" else "chsh"
 
 
 def _parse_current_shell(platform: Platform, stdout: str) -> Path | None:
@@ -220,8 +225,9 @@ class EnsureDefaultShellStateChanger(RollbackableStateChanger):
                 f"(set register_in_etc_shells=True to allow appending)"
             )
 
-        if self._pr.which("chsh") is None:
-            action_issues.append("chsh not on PATH")
+        required = _required_chsh_tool(platform)
+        if self._pr.which(required) is None:
+            action_issues.append(f"{required} not on PATH")
 
         if action_issues:
             return StateAssessment(
@@ -272,9 +278,12 @@ class EnsureDefaultShellStateChanger(RollbackableStateChanger):
             )
         return None
 
-    def _run_chsh(
+    def _set_login_shell(
         self, platform: Platform, pre_shell: Path
     ) -> tuple[ProcessResult | None, Result | None]:
+        """Run the platform-specific shell-change command (`chsh` on linux,
+        `dscl . -change` on darwin). The umbrella failure code is
+        `CHSH_FAILED` regardless of platform — kept stable for callers."""
         params = self._params
         if platform == "darwin":
             argv: tuple[str, ...] = (
@@ -336,7 +345,7 @@ class EnsureDefaultShellStateChanger(RollbackableStateChanger):
             )
             return Result.failure("CHSH_FAILED", message)
 
-        run_result, failure = self._run_chsh(platform, current)
+        run_result, failure = self._set_login_shell(platform, current)
         if failure is not None:
             return failure
         assert run_result is not None
@@ -443,8 +452,9 @@ class EnsureDefaultShellRollbackStateChanger(StateChanger):
             issues.append(
                 f"prior shell missing or not a regular file: {self._pre_shell}"
             )
-        if self._pr.which("chsh") is None:
-            issues.append("chsh not on PATH")
+        required = _required_chsh_tool(platform)
+        if self._pr.which(required) is None:
+            issues.append(f"{required} not on PATH")
         if issues:
             return StateAssessment(
                 state=ExistingState.INVALID,
@@ -477,6 +487,17 @@ class EnsureDefaultShellRollbackStateChanger(StateChanger):
                 else f"user not found: {params.user}"
             )
             return Result.failure("CHSH_FAILED", message)
+
+        if current == self._pre_shell:
+            return Result(
+                status=ResultStatus.SUCCESS,
+                code="OK",
+                message=(
+                    f"login shell for {params.user} already "
+                    f"{self._pre_shell}; nothing to roll back"
+                ),
+                details={"pre_shell": str(self._pre_shell)},
+            )
 
         if platform == "darwin":
             argv: tuple[str, ...] = (

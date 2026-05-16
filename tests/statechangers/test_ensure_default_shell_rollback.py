@@ -123,8 +123,11 @@ def test_rollback_ready_when_current_shell_differs_from_pre_shell() -> None:
 
 
 def test_rollback_transition_invokes_chsh_with_pre_shell() -> None:
-    forward, pr, _ = _forward_executed_linux()
-    inverse = forward.rollback()
+    fs = InMemoryFileSystem()
+    fs.add_file(Path("/bin/bash"), mode=0o755)
+    pr = ScriptedProcessRunner()
+    pr.register_executable("getent")
+    pr.register_executable("chsh")
     pr.register(
         ("getent", "passwd", "alice"),
         ProcessResult(
@@ -138,12 +141,53 @@ def test_rollback_transition_invokes_chsh_with_pre_shell() -> None:
         ("chsh", "-s", "/bin/bash", "alice"),
         ProcessResult(exit_code=0, stdout="ok", stderr="", duration_ms=0),
     )
+    inverse = EnsureDefaultShellRollbackStateChanger(
+        EnsureDefaultShellParameters(user="alice", shell=Path("/bin/zsh")),
+        pre_shell=Path("/bin/bash"),
+        process_runner=pr,
+        file_system=fs,
+        env=ScriptedEnv.linux(),
+    )
 
     result = inverse.transition()
 
     assert result.status is ResultStatus.SUCCESS
     assert result.details["pre_shell"] == "/bin/bash"
     assert ("chsh", "-s", "/bin/bash", "alice") in [c.argv for c in pr.calls]
+
+
+def test_rollback_transition_is_noop_when_current_shell_already_pre_shell() -> None:
+    # If something else restored the shell between assess and transition,
+    # rollback should idempotently return SUCCESS rather than running
+    # `dscl -change` / `chsh` with a stale "old" value.
+    fs = InMemoryFileSystem()
+    fs.add_file(Path("/bin/bash"), mode=0o755)
+    pr = ScriptedProcessRunner()
+    pr.register_executable("getent")
+    pr.register_executable("chsh")
+    pr.register(
+        ("getent", "passwd", "alice"),
+        ProcessResult(
+            exit_code=0,
+            stdout="alice:x:1000:1000::/home/alice:/bin/bash\n",
+            stderr="",
+            duration_ms=0,
+        ),
+    )
+    inverse = EnsureDefaultShellRollbackStateChanger(
+        EnsureDefaultShellParameters(user="alice", shell=Path("/bin/zsh")),
+        pre_shell=Path("/bin/bash"),
+        process_runner=pr,
+        file_system=fs,
+        env=ScriptedEnv.linux(),
+    )
+
+    result = inverse.transition()
+
+    assert result.status is ResultStatus.SUCCESS
+    assert result.details["pre_shell"] == "/bin/bash"
+    # No chsh invocation occurred — only the read probe.
+    assert not any(c.argv[:2] == ("chsh", "-s") for c in pr.calls)
 
 
 def test_forward_rollback_propagates_pre_shell_after_successful_transition() -> None:
