@@ -37,6 +37,10 @@ from .ensure_git_repo_cloned import (
     GitRef as GitRef,
     Tag as Tag,
 )
+from .extract_archive import (
+    ExtractArchiveParameters as ExtractArchiveParameters,
+    ExtractArchiveStateChanger as ExtractArchiveStateChanger,
+)
 from .ensure_homebrew_installed import (
     EnsureHomebrewInstalledParameters as EnsureHomebrewInstalledParameters,
     EnsureHomebrewInstalledStateChanger as EnsureHomebrewInstalledStateChanger,
@@ -128,6 +132,8 @@ __all__ = [
     "EnsureSymlinkParameters",
     "EnsureSymlinkRollbackStateChanger",
     "EnsureSymlinkStateChanger",
+    "ExtractArchiveParameters",
+    "ExtractArchiveStateChanger",
     "FetchUrlToStringParameters",
     "FetchUrlToStringRollbackStateChanger",
     "FetchUrlToStringStateChanger",

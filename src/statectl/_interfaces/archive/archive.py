@@ -32,4 +32,10 @@ class Archive(ABC):
     def detect_format(self, path: Path) -> ArchiveFormat | None: ...
 
     @abstractmethod
-    def extract(self, src: Path, dest: Path, format: ArchiveFormat) -> None: ...
+    def extract(
+        self,
+        src: Path,
+        dest: Path,
+        format: ArchiveFormat,
+        strip_components: int = 0,
+    ) -> None: ...

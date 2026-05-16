@@ -23,6 +23,7 @@ class RecordedExtract:
     src: Path
     dest: Path
     format: ArchiveFormat
+    strip_components: int = 0
 
 
 @dataclass
@@ -53,8 +54,18 @@ class ScriptedArchive(Archive):
         return registered.format if registered else None
 
     @override
-    def extract(self, src: Path, dest: Path, format: ArchiveFormat) -> None:
-        self.calls.append(RecordedExtract(src=src, dest=dest, format=format))
+    def extract(
+        self,
+        src: Path,
+        dest: Path,
+        format: ArchiveFormat,
+        strip_components: int = 0,
+    ) -> None:
+        self.calls.append(
+            RecordedExtract(
+                src=src, dest=dest, format=format, strip_components=strip_components
+            )
+        )
         registered = self._archives.get(src)
         if registered is None:
             raise ArchiveNotFound("archive not found", path=src)
@@ -62,7 +73,19 @@ class ScriptedArchive(Archive):
             return
         self.file_system.create_folder(dest, parents=True, exist_ok=True)
         for name, content in registered.entries:
-            target = dest / name
+            stripped = _strip_path(name, strip_components)
+            if stripped is None:
+                continue
+            target = dest / stripped
             if target.parent != dest:
                 self.file_system.create_folder(target.parent, parents=True, exist_ok=True)
             self.file_system.write_text_file(target, content)
+
+
+def _strip_path(name: str, strip_components: int) -> str | None:
+    if strip_components <= 0:
+        return name
+    parts = [p for p in name.replace("\\", "/").split("/") if p not in ("", ".")]
+    if len(parts) <= strip_components:
+        return None
+    return "/".join(parts[strip_components:])

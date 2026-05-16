@@ -11,6 +11,7 @@ from statectl._statechangers import (
 )
 from tests.fakes.scripted_clock import ScriptedClock
 from tests.fakes.scripted_env import ScriptedEnv
+from tests.fakes.scripted_archive import ScriptedArchive
 from tests.fakes.scripted_http_client import ScriptedHttpClient
 from tests.fakes.in_memory_file_system import InMemoryFileSystem
 from tests.fakes.scripted_process_runner import ScriptedProcessRunner
@@ -23,6 +24,7 @@ def _engine(fs: InMemoryFileSystem) -> StateCtl:
         process_runner=ScriptedProcessRunner(),
         http_client=ScriptedHttpClient(),
         env=ScriptedEnv.linux(),
+        archive=ScriptedArchive(),
         hashing=RealHashing(),
         clock=ScriptedClock(),
         variable_registry=InMemoryVariableRegistry(),
