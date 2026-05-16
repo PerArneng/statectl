@@ -225,3 +225,28 @@ def test_replace_in_file_passes_encoding() -> None:
         "/work/cfg", match, encoding="latin-1"
     )
     assert changer.params.encoding == "latin-1"
+
+
+def test_download_file_routes_through_fakes() -> None:
+    from statectl._statechangers import (
+        DownloadFileParameters,
+        DownloadFileStateChanger,
+    )
+    from tests.fakes.scripted_hashing import ScriptedHashing
+    from tests.fakes.scripted_http_client import ScriptedHttpClient
+
+    fs = InMemoryFileSystem()
+    fs.add_dir(Path("/work"))
+    http = ScriptedHttpClient(file_system=fs)
+    hashing = ScriptedHashing(file_system=fs)
+    engine = StateCtl.new(
+        file_system=fs, http_client=http, hashing=hashing
+    )
+    changer = engine.changers().download_file(
+        "http://x/a", "/work/a", sha256=None, mode=0o600
+    )
+    assert isinstance(changer, DownloadFileStateChanger)
+    assert isinstance(changer.params, DownloadFileParameters)
+    assert changer.params.url == "http://x/a"
+    assert changer.params.dest == Path("/work/a")
+    assert changer.params.mode == 0o600

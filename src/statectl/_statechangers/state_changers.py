@@ -6,6 +6,7 @@ from typing import Iterable, Mapping, Sequence
 
 from statectl._interfaces.env import Env
 from statectl._interfaces.fs import FileSystem
+from statectl._interfaces.hashing import Hashing
 from statectl._interfaces.http import HttpClient
 from statectl._interfaces.process import ProcessRunner
 from statectl._statechangers.brew_cask import (
@@ -24,6 +25,10 @@ from statectl._statechangers.delete_path import (
     DeletePathParameters,
     DeletePathStateChanger,
     PathKind,
+)
+from statectl._statechangers.download_file import (
+    DownloadFileParameters,
+    DownloadFileStateChanger,
 )
 from statectl._statechangers.ensure_directory import (
     EnsureDirectoryParameters,
@@ -64,11 +69,13 @@ class StateChangers:
         process_runner: ProcessRunner,
         http_client: HttpClient,
         env: Env,
+        hashing: Hashing,
     ) -> None:
         self._fs: FileSystem = file_system
         self._pr: ProcessRunner = process_runner
         self._http: HttpClient = http_client
         self._env: Env = env
+        self._hashing: Hashing = hashing
 
     def brew_cask(
         self,
@@ -162,6 +169,30 @@ class StateChangers:
                 missing_ok=missing_ok,
             ),
             file_system=self._fs,
+        )
+
+    def download_file(
+        self,
+        url: str,
+        dest: str | Path,
+        *,
+        sha256: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        mode: int | None = None,
+        overwrite_mismatch: bool = False,
+    ) -> DownloadFileStateChanger:
+        return DownloadFileStateChanger(
+            DownloadFileParameters(
+                url=url,
+                dest=Path(dest),
+                sha256=sha256,
+                headers=dict(headers) if headers else {},
+                mode=mode,
+                overwrite_mismatch=overwrite_mismatch,
+            ),
+            file_system=self._fs,
+            http_client=self._http,
+            hashing=self._hashing,
         )
 
     def ensure_symlink(

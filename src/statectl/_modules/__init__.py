@@ -5,6 +5,7 @@ from .in_memory_variable_registry import (
 from .real_archive import RealArchive as RealArchive
 from .real_env import RealEnv as RealEnv
 from .real_file_system import RealFileSystem as RealFileSystem
+from .real_hashing import RealHashing as RealHashing
 from .real_http_client import RealHttpClient as RealHttpClient
 from .real_process_runner import RealProcessRunner as RealProcessRunner
 
@@ -14,6 +15,7 @@ __all__ = [
     "RealArchive",
     "RealEnv",
     "RealFileSystem",
+    "RealHashing",
     "RealHttpClient",
     "RealProcessRunner",
 ]

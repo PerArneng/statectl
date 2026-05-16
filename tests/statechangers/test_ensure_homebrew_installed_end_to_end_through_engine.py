@@ -6,7 +6,7 @@ from statectl import StateCtl
 from statectl._engine_result import NodeOutcome
 from statectl._interfaces.http import HttpResponse
 from statectl._interfaces.process import ProcessResult
-from statectl._modules import DefaultLogger, InMemoryVariableRegistry
+from statectl._modules import DefaultLogger, InMemoryVariableRegistry, RealHashing
 from statectl._statechangers import (
     EnsureHomebrewInstalledParameters,
     EnsureHomebrewInstalledStateChanger,
@@ -33,6 +33,7 @@ def _engine(
         process_runner=pr,
         http_client=http,
         env=env,
+        hashing=RealHashing(),
         variable_registry=InMemoryVariableRegistry(),
     )
 
