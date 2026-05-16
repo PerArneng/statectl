@@ -32,12 +32,16 @@ class ScriptedHttpClient(HttpClient):
     """
 
     _responses: dict[str, HttpResponse] = field(default_factory=dict)
+    _bytes: dict[str, bytes] = field(default_factory=dict)
     _downloads: dict[str, bytes] = field(default_factory=dict)
     calls: list[RecordedHttpCall] = field(default_factory=list)
     file_system: InMemoryFileSystem | None = None
 
     def register_response(self, url: str, response: HttpResponse) -> None:
         self._responses[url] = response
+
+    def register_bytes(self, url: str, body: bytes) -> None:
+        self._bytes[url] = body
 
     def register_download(self, url: str, body: bytes) -> None:
         self._downloads[url] = body
@@ -55,6 +59,20 @@ class ScriptedHttpClient(HttpClient):
         if url not in self._responses:
             raise HttpNotFound(f"no scripted response for {url}", url=url)
         return self._responses[url]
+
+    @override
+    def get_bytes(
+        self,
+        url: str,
+        headers: Mapping[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> bytes:
+        self.calls.append(
+            RecordedHttpCall(method="get_bytes", url=url, headers=headers, timeout=timeout, dest=None)
+        )
+        if url not in self._bytes:
+            raise HttpNotFound(f"no scripted bytes for {url}", url=url)
+        return self._bytes[url]
 
     @override
     def download_to_file(

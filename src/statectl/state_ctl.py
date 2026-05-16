@@ -20,6 +20,7 @@ from statectl._execution_node import (
     ExecutionNode,
     PublishCallback,
 )
+from statectl._interfaces.clock import Clock
 from statectl._interfaces.env import Env
 from statectl._interfaces.fs import FileSystem
 from statectl._interfaces.hashing import Hashing
@@ -35,6 +36,7 @@ from statectl._interfaces.registry import (
 from statectl._modules import (
     DefaultLogger,
     InMemoryVariableRegistry,
+    RealClock,
     RealEnv,
     RealFileSystem,
     RealHashing,
@@ -78,6 +80,7 @@ class StateCtl:
         http_client: HttpClient,
         env: Env,
         hashing: Hashing,
+        clock: Clock,
         variable_registry: VariableRegistry,
     ) -> None:
         self._logger: Logger = logger
@@ -86,6 +89,7 @@ class StateCtl:
         self._http: HttpClient = http_client
         self._env: Env = env
         self._hashing: Hashing = hashing
+        self._clock: Clock = clock
         self._registry: VariableRegistry = variable_registry
         self._nodes: list[ExecutionNode] = []
         self._node_by_handle_id: dict[int, ExecutionNode] = {}
@@ -98,6 +102,7 @@ class StateCtl:
             http_client=self._http,
             env=self._env,
             hashing=self._hashing,
+            clock=self._clock,
         )
 
     def registry(self) -> VariableRegistry:
@@ -485,6 +490,7 @@ class StateCtl:
         http_client: HttpClient | None = None,
         env: Env | None = None,
         hashing: Hashing | None = None,
+        clock: Clock | None = None,
         variable_registry: VariableRegistry | None = None,
     ) -> StateCtl:
         container = _Container()
@@ -498,6 +504,8 @@ class StateCtl:
             container.env.override(providers.Object(env))
         if hashing is not None:
             container.hashing.override(providers.Object(hashing))
+        if clock is not None:
+            container.clock.override(providers.Object(clock))
         if variable_registry is not None:
             container.variable_registry.override(providers.Object(variable_registry))
         return container.engine()
@@ -510,6 +518,7 @@ class _Container(containers.DeclarativeContainer):
     http_client = providers.Singleton(RealHttpClient)
     env = providers.Singleton(RealEnv)
     hashing = providers.Singleton(RealHashing)
+    clock = providers.Singleton(RealClock)
     variable_registry = providers.Singleton(InMemoryVariableRegistry)
     engine = providers.Singleton(
         StateCtl,
@@ -519,5 +528,6 @@ class _Container(containers.DeclarativeContainer):
         http_client=http_client,
         env=env,
         hashing=hashing,
+        clock=clock,
         variable_registry=variable_registry,
     )

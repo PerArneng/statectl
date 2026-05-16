@@ -6,6 +6,7 @@ from statectl import StateCtl
 from statectl._engine_result import NodeOutcome
 from statectl._modules import DefaultLogger, InMemoryVariableRegistry, RealHashing
 from statectl._statechangers import DeletePathParameters, DeletePathStateChanger
+from tests.fakes.scripted_clock import ScriptedClock
 from tests.fakes.scripted_env import ScriptedEnv
 from tests.fakes.scripted_http_client import ScriptedHttpClient
 from tests.fakes.in_memory_file_system import InMemoryFileSystem
@@ -20,6 +21,7 @@ def _engine(fs: InMemoryFileSystem) -> StateCtl:
         http_client=ScriptedHttpClient(),
         env=ScriptedEnv.linux(),
         hashing=RealHashing(),
+        clock=ScriptedClock(),
         variable_registry=InMemoryVariableRegistry(),
     )
 
