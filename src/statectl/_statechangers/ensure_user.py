@@ -28,13 +28,15 @@ from statectl._state_changer import (
 
 
 _OUTPUT_CAP = 4096
+# Trailing `$` is allowed so Samba machine accounts (e.g. `host$`) are accepted.
 _USERNAME_RE = re.compile(r"^[a-z_][a-z0-9_-]*\$?$")
+_USERNAME_MAX_LEN = 32
 _LINUX_BINARIES: tuple[str, ...] = ("useradd", "usermod", "getent")
 _DARWIN_BINARIES: tuple[str, ...] = ("dscl", "dseditgroup")
 _USER_CREATE_FAILED = "USER_CREATE_FAILED"
 _GROUP_MEMBERSHIP_FAILED = "GROUP_MEMBERSHIP_FAILED"
 _UID_CONFLICT = "UID_CONFLICT"
-_PLATFORM_BINARY_MISSING = "PLATFORM_BINARY_MISSING"
+_USER_LOOKUP_FAILED = "USER_LOOKUP_FAILED"
 _USER_DELETE_FAILED = "USER_DELETE_FAILED"
 
 
@@ -46,6 +48,15 @@ def _truncate(text: str) -> str:
 
 @dataclass(frozen=True)
 class EnsureUserParameters(Parameters):
+    """Parameters describing a desired local user account.
+
+    Platform asymmetries to be aware of:
+    - Linux: `useradd -d <home> -m` creates the home directory on disk.
+    - macOS: dscl writes `NFSHomeDirectory` but does *not* create the directory;
+      drivers needing the directory must run `createhomedir` separately.
+    - Neither platform sets a password; the account is created without one.
+    """
+
     username: str
     uid: int | None = None
     home: Path | None = None
@@ -389,10 +400,6 @@ class EnsureUserStateChanger(RollbackableStateChanger):
     def created_by_us(self) -> bool:
         return self._created_by_us
 
-    @property
-    def recorded_info(self) -> _UserInfo | None:
-        return self._recorded_info
-
     @override
     def name(self) -> str:
         return f"ensure-user:{self._params.username}"
@@ -409,6 +416,11 @@ class EnsureUserStateChanger(RollbackableStateChanger):
         issues: list[str] = []
         if not _USERNAME_RE.match(params.username):
             issues.append(f"invalid username: {params.username!r}")
+        elif len(params.username) > _USERNAME_MAX_LEN:
+            issues.append(
+                f"username too long ({len(params.username)} > "
+                f"{_USERNAME_MAX_LEN}): {params.username!r}"
+            )
         return issues
 
     def _assess_uid_conflict(
@@ -422,7 +434,11 @@ class EnsureUserStateChanger(RollbackableStateChanger):
             return [owner.message]
         if owner is None:
             return []
-        if existing is not None and owner == params.username:
+        if (
+            existing is not None
+            and owner == params.username
+            and existing.uid == params.uid
+        ):
             return []
         return [f"uid {params.uid} in use by {owner}"]
 
@@ -485,7 +501,7 @@ class EnsureUserStateChanger(RollbackableStateChanger):
         issues.extend(gid_issues)
         issues.extend(self._assess_uid_conflict(platform, existing))
 
-        _, supp_issues = self._assess_supp_groups(platform)
+        already_in, supp_issues = self._assess_supp_groups(platform)
         issues.extend(supp_issues)
 
         if existing is not None and params.enforce_attributes:
@@ -499,7 +515,6 @@ class EnsureUserStateChanger(RollbackableStateChanger):
             )
 
         if existing is not None:
-            already_in, _ = self._assess_supp_groups(platform)
             missing = [
                 g for g in params.supplementary_groups if g not in already_in
             ]
@@ -609,7 +624,7 @@ class EnsureUserStateChanger(RollbackableStateChanger):
         post = _probe_user(self._pr, platform, params.username)
         if isinstance(post, _ProbeError) or post is None:
             return Result.failure(
-                _USER_CREATE_FAILED,
+                _USER_CREATE_FAILED if created_by_us else _USER_LOOKUP_FAILED,
                 "user not visible after transition",
             )
         self._created_by_us = created_by_us

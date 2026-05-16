@@ -43,7 +43,7 @@ class _StatefulUserLinux(ScriptedProcessRunner):
     def _mark_exists(self) -> None:
         self._exists = True
         # Re-register so probes return the user now.
-        self._scripts = [s for s in self._scripts if s[0][:2] != ("getent", "passwd")]
+        self.reset_scripts_for(("getent", "passwd"))
         register_linux_user(
             self, self._username,
             uid=self._uid, gid=self._uid,
@@ -102,26 +102,65 @@ def test_transition_records_attributes_when_user_already_exists() -> None:
     assert not any(c.argv[:1] == ("useradd",) for c in pr.calls)
 
 
-def test_transition_creates_user_on_darwin_with_multiple_dscl_calls() -> None:
-    pr = darwin_runner_with_executables()
-    register_darwin_user_missing(pr, "alice")
-    register_darwin_uid_owner(pr, 700, None)
-    register_darwin_group(pr, "staff", gid=20)
-    # After create, the user is visible:
-    def _make_visible() -> None:
-        pr._scripts = [
-            s for s in pr._scripts
-            if s[0] != ("dscl", ".", "-read", "/Users/alice")
-        ]
+class _StatefulUserDarwin(ScriptedProcessRunner):
+    """Darwin runner where the first `dscl . -create /Users/<name>` flips
+    later `dscl . -read /Users/<name>` probes to return that user."""
+
+    def __init__(
+        self,
+        username: str,
+        *,
+        uid: int = 700,
+        gid: int = 20,
+        home: str = "/Users/alice",
+        shell: str = "/bin/zsh",
+    ) -> None:
+        super().__init__()
+        for name in ("dscl", "dseditgroup"):
+            self.register_executable(name)
+        self._username = username
+        self._uid = uid
+        self._gid = gid
+        self._home = home
+        self._shell = shell
+        self._exists = False
+        register_darwin_user_missing(self, username)
+        register_darwin_uid_owner(self, uid, None)
+
+    def _mark_exists(self) -> None:
+        self._exists = True
+        self.reset_scripts_for(("dscl", ".", "-read", f"/Users/{self._username}"))
         register_darwin_user(
-            pr, "alice", uid=700, gid=20, home="/Users/alice", shell="/bin/zsh"
+            self,
+            self._username,
+            uid=self._uid,
+            gid=self._gid,
+            home=self._home,
+            shell=self._shell,
         )
 
-    # Hook the first `dscl . -create` call: easiest is to register a side
-    # effect by subclassing — but registering a stateful runner is overkill
-    # here. We simulate by toggling after the changer's first probe.
-    _make_visible()
+    @override
+    def run(
+        self,
+        argv: Sequence[str],
+        *,
+        cwd: Path | None = None,
+        env: Mapping[str, str] | None = None,
+        stdin: str | None = None,
+        timeout: float | None = None,
+    ) -> ProcessResult:
+        argv_tuple = tuple(argv)
+        create_root = ("dscl", ".", "-create", f"/Users/{self._username}")
+        if argv_tuple == create_root:
+            super().run(argv, cwd=cwd, env=env, stdin=stdin, timeout=timeout)
+            self._mark_exists()
+            return ProcessResult(exit_code=0, stdout="", stderr="", duration_ms=0)
+        return super().run(argv, cwd=cwd, env=env, stdin=stdin, timeout=timeout)
 
+
+def test_transition_creates_user_on_darwin_with_multiple_dscl_calls() -> None:
+    pr = _StatefulUserDarwin("alice", uid=700, gid=20)
+    register_darwin_group(pr, "staff", gid=20)
     changer = EnsureUserStateChanger(
         EnsureUserParameters(
             username="alice",
@@ -134,13 +173,21 @@ def test_transition_creates_user_on_darwin_with_multiple_dscl_calls() -> None:
         file_system=InMemoryFileSystem(),
         env=ScriptedEnv.darwin(),
     )
-    # The pre-create probe will see the user as existing; transition will
-    # treat as "already there → just record". This still exercises the
-    # darwin path (resolve gid, no useradd) — but to validate the full
-    # create path we drive a separate test below.
     result = changer.transition()
     assert result.status is ResultStatus.SUCCESS
-    assert result.details["created_by_us"] == "false"
+    assert result.details["created_by_us"] == "true"
+    assert result.details["uid"] == "700"
+    assert changer.created_by_us is True
+
+    create_calls = [c for c in pr.calls if c.argv[:3] == ("dscl", ".", "-create")]
+    create_targets = [c.argv for c in create_calls]
+    user_path = "/Users/alice"
+    # Root record + each attribute we requested (uid, primary gid, home, shell).
+    assert ("dscl", ".", "-create", user_path) in create_targets
+    assert ("dscl", ".", "-create", user_path, "UniqueID", "700") in create_targets
+    assert ("dscl", ".", "-create", user_path, "PrimaryGroupID", "20") in create_targets
+    assert ("dscl", ".", "-create", user_path, "NFSHomeDirectory", user_path) in create_targets
+    assert ("dscl", ".", "-create", user_path, "UserShell", "/bin/zsh") in create_targets
 
 
 def test_transition_adds_missing_supplementary_groups_on_linux() -> None:
