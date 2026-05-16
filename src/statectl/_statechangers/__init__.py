@@ -11,6 +11,10 @@ from .apt_repository import (
     KeySource as KeySource,
     UrlKey as UrlKey,
 )
+from .apt_update import (
+    AptUpdateParameters as AptUpdateParameters,
+    AptUpdateStateChanger as AptUpdateStateChanger,
+)
 from .brew_cask import (
     BrewCaskParameters as BrewCaskParameters,
     BrewCaskRollbackStateChanger as BrewCaskRollbackStateChanger,
@@ -126,6 +130,8 @@ __all__ = [
     "AptRepositoryParameters",
     "AptRepositoryRollbackStateChanger",
     "AptRepositoryStateChanger",
+    "AptUpdateParameters",
+    "AptUpdateStateChanger",
     "AtEnd",
     "AtStart",
     "BeforeRegex",
