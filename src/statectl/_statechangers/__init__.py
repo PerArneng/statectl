@@ -91,6 +91,11 @@ from .ensure_systemd_unit import (
     EnsureSystemdUnitStateChanger as EnsureSystemdUnitStateChanger,
     SystemdScope as SystemdScope,
 )
+from .ensure_user import (
+    EnsureUserParameters as EnsureUserParameters,
+    EnsureUserRollbackStateChanger as EnsureUserRollbackStateChanger,
+    EnsureUserStateChanger as EnsureUserStateChanger,
+)
 from .ensure_symlink import (
     EnsureSymlinkParameters as EnsureSymlinkParameters,
     EnsureSymlinkRollbackStateChanger as EnsureSymlinkRollbackStateChanger,
@@ -190,6 +195,9 @@ __all__ = [
     "EnsureSystemdUnitParameters",
     "EnsureSystemdUnitRollbackStateChanger",
     "EnsureSystemdUnitStateChanger",
+    "EnsureUserParameters",
+    "EnsureUserRollbackStateChanger",
+    "EnsureUserStateChanger",
     "SystemdScope",
     "EnsureSymlinkParameters",
     "EnsureSymlinkRollbackStateChanger",

@@ -42,6 +42,15 @@ class ScriptedProcessRunner(ProcessRunner):
     def register(self, argv_prefix: Sequence[str], result: ProcessResult) -> None:
         self._scripts.append((tuple(argv_prefix), result))
 
+    def reset_scripts_for(self, argv_prefix: Sequence[str]) -> None:
+        """Remove every previously-registered script whose registered prefix
+        starts with `argv_prefix`. Useful for fakes that need to flip a probe's
+        result mid-test (e.g. user missing → user present after create)."""
+        prefix = tuple(argv_prefix)
+        self._scripts = [
+            s for s in self._scripts if s[0][: len(prefix)] != prefix
+        ]
+
     @override
     def which(self, name: str) -> Path | None:
         return self._executables.get(name)
