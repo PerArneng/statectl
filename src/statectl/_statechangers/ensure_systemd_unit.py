@@ -190,16 +190,17 @@ class EnsureSystemdUnitStateChanger(RollbackableStateChanger):
 
         if not params.unit_name:
             issues.append("unit_name is empty")
-        elif not any(params.unit_name.endswith(s) for s in _KNOWN_SUFFIXES):
-            issues.append(
-                f"unit suffix unrecognised: {params.unit_name!r} "
-                f"(known suffixes: {', '.join(_KNOWN_SUFFIXES)})"
-            )
-        elif "/" in params.unit_name or "\0" in params.unit_name:
-            issues.append(
-                f"unit_name must not contain path separators or NUL: "
-                f"{params.unit_name!r}"
-            )
+        else:
+            if "/" in params.unit_name or "\0" in params.unit_name:
+                issues.append(
+                    f"unit_name must not contain path separators or NUL: "
+                    f"{params.unit_name!r}"
+                )
+            if not any(params.unit_name.endswith(s) for s in _KNOWN_SUFFIXES):
+                issues.append(
+                    f"unit suffix unrecognised: {params.unit_name!r} "
+                    f"(known suffixes: {', '.join(_KNOWN_SUFFIXES)})"
+                )
 
         if not _has_section_header(params.unit_content):
             issues.append(

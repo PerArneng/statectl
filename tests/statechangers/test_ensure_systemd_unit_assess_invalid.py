@@ -123,6 +123,14 @@ def test_invalid_when_unit_name_contains_slash() -> None:
     assert any("path separators" in i for i in assessment.issues)
 
 
+def test_invalid_reports_both_separator_and_suffix_issues() -> None:
+    assessment = make_changer(unit_name="dir/foo.weird").assess_state()
+    assert assessment.state is ExistingState.INVALID
+    joined = " ".join(assessment.issues)
+    assert "path separators" in joined
+    assert "unit suffix unrecognised" in joined
+
+
 def test_baseline_is_ready() -> None:
     # Sanity check that the helper's defaults aren't accidentally INVALID.
     assert make_changer().assess_state().state is ExistingState.READY
