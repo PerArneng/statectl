@@ -78,6 +78,12 @@ from .ensure_directory import (
     EnsureDirectoryRollbackStateChanger as EnsureDirectoryRollbackStateChanger,
     EnsureDirectoryStateChanger as EnsureDirectoryStateChanger,
 )
+from .ensure_systemd_unit import (
+    EnsureSystemdUnitParameters as EnsureSystemdUnitParameters,
+    EnsureSystemdUnitRollbackStateChanger as EnsureSystemdUnitRollbackStateChanger,
+    EnsureSystemdUnitStateChanger as EnsureSystemdUnitStateChanger,
+    SystemdScope as SystemdScope,
+)
 from .ensure_symlink import (
     EnsureSymlinkParameters as EnsureSymlinkParameters,
     EnsureSymlinkRollbackStateChanger as EnsureSymlinkRollbackStateChanger,
@@ -171,6 +177,10 @@ __all__ = [
     "EnsureLineInFileParameters",
     "EnsureLineInFileRollbackStateChanger",
     "EnsureLineInFileStateChanger",
+    "EnsureSystemdUnitParameters",
+    "EnsureSystemdUnitRollbackStateChanger",
+    "EnsureSystemdUnitStateChanger",
+    "SystemdScope",
     "EnsureSymlinkParameters",
     "EnsureSymlinkRollbackStateChanger",
     "EnsureSymlinkStateChanger",
