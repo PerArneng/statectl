@@ -60,6 +60,13 @@ from .ensure_launchd_agent import (
     EnsureLaunchdAgentStateChanger as EnsureLaunchdAgentStateChanger,
     Scope as Scope,
 )
+from .ensure_service import (
+    EnsureServiceParameters as EnsureServiceParameters,
+    EnsureServiceRollbackStateChanger as EnsureServiceRollbackStateChanger,
+    EnsureServiceStateChanger as EnsureServiceStateChanger,
+    LaunchdSpec as LaunchdSpec,
+    SystemdSpec as SystemdSpec,
+)
 from .extract_archive import (
     ExtractArchiveParameters as ExtractArchiveParameters,
     ExtractArchiveStateChanger as ExtractArchiveStateChanger,
@@ -177,6 +184,9 @@ __all__ = [
     "EnsureLineInFileParameters",
     "EnsureLineInFileRollbackStateChanger",
     "EnsureLineInFileStateChanger",
+    "EnsureServiceParameters",
+    "EnsureServiceRollbackStateChanger",
+    "EnsureServiceStateChanger",
     "EnsureSystemdUnitParameters",
     "EnsureSystemdUnitRollbackStateChanger",
     "EnsureSystemdUnitStateChanger",
@@ -192,6 +202,7 @@ __all__ = [
     "GitRef",
     "InlineKey",
     "KeySource",
+    "LaunchdSpec",
     "NewTextFileParameters",
     "NewTextFileRollbackStateChanger",
     "NewTextFileStateChanger",
@@ -210,6 +221,7 @@ __all__ = [
     "SetFileModeRollbackStateChanger",
     "SetFileModeStateChanger",
     "StateChangers",
+    "SystemdSpec",
     "Tag",
     "UrlKey",
 ]
