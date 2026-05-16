@@ -104,3 +104,19 @@ def test_ready_when_mode_differs() -> None:
         fs,
     ).assess_state()
     assert a.state is ExistingState.READY
+
+
+def test_uppercase_sha256_is_normalized() -> None:
+    fs = InMemoryFileSystem()
+    fs.add_dir(Path("/work"))
+    fs.add_file(Path("/work/a"), content="hello")
+    expected_upper = sha256_of("hello").upper()
+    a = _build(
+        DownloadFileParameters(
+            url="http://x/a",
+            dest=Path("/work/a"),
+            sha256=expected_upper,
+        ),
+        fs,
+    ).assess_state()
+    assert a.state is ExistingState.ALREADY_APPLIED

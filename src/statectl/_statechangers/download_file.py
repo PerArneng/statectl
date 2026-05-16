@@ -28,12 +28,27 @@ _HEX_DIGITS = set("0123456789abcdef")
 
 @dataclass(frozen=True)
 class DownloadFileParameters(Parameters):
+    """Parameters for DownloadFile.
+
+    Note: `assess_state` re-hashes the existing dest on every call when
+    `sha256` is set — cheap for small files, but consider this if the
+    expected payload is large and the changer is polled frequently.
+
+    When `overwrite_mismatch=True`, an unhashable existing dest (e.g.
+    transient IO error) is treated as a reason to proceed, not abort —
+    the user has already opted into clobbering whatever is there.
+    """
+
     url: str
     dest: Path
     sha256: str | None = None
     headers: Mapping[str, str] = field(default_factory=dict)
     mode: int | None = None
     overwrite_mismatch: bool = False
+
+    def __post_init__(self) -> None:
+        if self.sha256 is not None:
+            object.__setattr__(self, "sha256", self.sha256.lower())
 
 
 def _looks_like_http_url(url: str) -> bool:
@@ -129,6 +144,8 @@ class DownloadFileStateChanger(RollbackableStateChanger):
         try:
             actual = self._hashing.sha256_file(p.dest)
         except HashingError as e:
+            if p.overwrite_mismatch:
+                return False
             issues.append(f"cannot hash existing dest: {e}")
             return False
         if actual == p.sha256:
@@ -166,11 +183,17 @@ class DownloadFileStateChanger(RollbackableStateChanger):
         self._observed_sha256 = actual
 
         if p.sha256 is not None and actual != p.sha256:
-            self._unlink_quietly(p.dest)
+            unlink_error = self._try_unlink(p.dest)
             self._observed_sha256 = None
+            if unlink_error is None:
+                detail = f"removed {p.dest}"
+            else:
+                detail = (
+                    f"leftover file at {p.dest} could not be removed: {unlink_error}"
+                )
             return Result.failure(
                 "CHECKSUM_MISMATCH",
-                f"downloaded sha256 {actual}, expected {p.sha256} (removed {p.dest})",
+                f"downloaded sha256 {actual}, expected {p.sha256} ({detail})",
             )
 
         if p.mode is not None:
@@ -183,11 +206,14 @@ class DownloadFileStateChanger(RollbackableStateChanger):
 
         return Result.success(f"downloaded {p.url} -> {p.dest}")
 
-    def _unlink_quietly(self, path: Path) -> None:
+    def _try_unlink(self, path: Path) -> FsError | None:
         try:
             self._fs.delete_file(path)
-        except FsError:
-            pass
+        except FsNotFound:
+            return None
+        except FsError as e:
+            return e
+        return None
 
     @override
     def rollback(self) -> StateChanger:
@@ -203,6 +229,7 @@ class DownloadFileRollbackStateChanger(StateChanger):
     def __init__(
         self,
         params: DownloadFileParameters,
+        *,
         expected_sha256: str | None = None,
         file_system: FileSystem | None = None,
         hashing: Hashing | None = None,

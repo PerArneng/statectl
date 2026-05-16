@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable
 
 import pytest
 
@@ -115,5 +114,31 @@ def test_chmod_failure_returns_chmod_failed() -> None:
     assert result.code == "CHMOD_FAILED"
 
 
-def _noop_factory() -> Callable[[], None]:
-    return lambda: None
+def test_checksum_mismatch_message_reports_unlink_failure() -> None:
+    inner_fs = InMemoryFileSystem()
+    inner_fs.add_dir(Path("/work"))
+    fs = FailingFileSystem(inner_fs)
+    http = ScriptedHttpClient(file_system=inner_fs)
+    http.register_download("http://x/a", b"actual")
+    fs.fail(
+        "delete_file",
+        FsIoError("device busy", path=Path("/work/a")),
+        path=Path("/work/a"),
+    )
+    expected = "0" * 64
+    changer = DownloadFileStateChanger(
+        DownloadFileParameters(
+            url="http://x/a",
+            dest=Path("/work/a"),
+            sha256=expected,
+            overwrite_mismatch=True,
+        ),
+        file_system=fs,
+        http_client=http,
+        hashing=ScriptedHashing(file_system=inner_fs),
+    )
+
+    result = changer.transition()
+    assert result.code == "CHECKSUM_MISMATCH"
+    assert "could not be removed" in result.message
+    assert inner_fs.exists(Path("/work/a"))

@@ -71,6 +71,14 @@ class ScriptedHttpClient(HttpClient):
             raise HttpNotFound(f"no scripted download for {url}", url=url)
         body = self._downloads[url]
         if self.file_system is not None:
-            self.file_system.add_file(dest, content=body.decode("utf-8", errors="replace"))
+            try:
+                text = body.decode("utf-8")
+            except UnicodeDecodeError as e:
+                raise ValueError(
+                    f"ScriptedHttpClient: registered body for {url} is not valid "
+                    f"utf-8 ({e}); add_binary_file support is not yet wired through "
+                    f"InMemoryFileSystem"
+                ) from e
+            self.file_system.add_file(dest, content=text)
         else:
             dest.write_bytes(body)
