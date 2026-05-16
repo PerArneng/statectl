@@ -58,6 +58,6 @@ Read these only when relevant to the current task:
 - Adding a new `StateChanger` → invoke the `new-state-changer` skill.
 - Adding a new capability (interface + module + DI wiring) → invoke the `new-capability` skill.
 - Reference implementations to read before writing similar code:
-  - `src/statectl/_statechangers/new_text_file.py` — rollbackable, single capability, content-equivalence idempotency.
-  - `src/statectl/_statechangers/run_command.py` — non-rollbackable, two capabilities, sentinel-based (`creates`/`removes`) idempotency.
+  - `src/statectl/_statechangers/fs/new_text_file.py` — rollbackable, single capability, content-equivalence idempotency.
+  - `src/statectl/_statechangers/process/run_command.py` — non-rollbackable, two capabilities, sentinel-based (`creates`/`removes`) idempotency.
   - `src/statectl/_interfaces/fs/` (ABC + `fs_errors.py` + `__init__.py` re-exports) + `src/statectl/_modules/real_file_system.py` — capability shape (interface + typed errors + real impl + `_translate()` context manager).

@@ -7,7 +7,7 @@ from statectl._statechangers import (
     EnsureUserParameters,
     EnsureUserRollbackStateChanger,
 )
-from statectl._statechangers.ensure_user import _UserInfo
+from statectl._statechangers.posix.ensure_user import _UserInfo
 from tests.fakes.in_memory_file_system import InMemoryFileSystem
 from tests.fakes.scripted_env import ScriptedEnv
 from tests.fakes.scripted_process_runner import ScriptedProcessRunner

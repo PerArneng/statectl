@@ -1,9 +1,9 @@
-from .apt_package import (
+from .apt.apt_package import (
     AptPackageParameters as AptPackageParameters,
     AptPackageRollbackStateChanger as AptPackageRollbackStateChanger,
     AptPackageStateChanger as AptPackageStateChanger,
 )
-from .apt_repository import (
+from .apt.apt_repository import (
     AptRepositoryParameters as AptRepositoryParameters,
     AptRepositoryRollbackStateChanger as AptRepositoryRollbackStateChanger,
     AptRepositoryStateChanger as AptRepositoryStateChanger,
@@ -11,41 +11,41 @@ from .apt_repository import (
     KeySource as KeySource,
     UrlKey as UrlKey,
 )
-from .apt_update import (
+from .apt.apt_update import (
     AptUpdateParameters as AptUpdateParameters,
     AptUpdateStateChanger as AptUpdateStateChanger,
 )
-from .brew_cask import (
+from .brew.brew_cask import (
     BrewCaskParameters as BrewCaskParameters,
     BrewCaskRollbackStateChanger as BrewCaskRollbackStateChanger,
     BrewCaskStateChanger as BrewCaskStateChanger,
 )
-from .brew_package import (
+from .brew.brew_package import (
     BrewPackageParameters as BrewPackageParameters,
     BrewPackageRollbackStateChanger as BrewPackageRollbackStateChanger,
     BrewPackageStateChanger as BrewPackageStateChanger,
 )
-from .brew_tap import (
+from .brew.brew_tap import (
     BrewTapParameters as BrewTapParameters,
     BrewTapRollbackStateChanger as BrewTapRollbackStateChanger,
     BrewTapStateChanger as BrewTapStateChanger,
 )
-from .copy_file import (
+from .fs.copy_file import (
     CopyFileParameters as CopyFileParameters,
     CopyFileRollbackStateChanger as CopyFileRollbackStateChanger,
     CopyFileStateChanger as CopyFileStateChanger,
 )
-from .delete_path import (
+from .fs.delete_path import (
     DeletePathParameters as DeletePathParameters,
     DeletePathStateChanger as DeletePathStateChanger,
     PathKind as PathKind,
 )
-from .download_file import (
+from .net.download_file import (
     DownloadFileParameters as DownloadFileParameters,
     DownloadFileRollbackStateChanger as DownloadFileRollbackStateChanger,
     DownloadFileStateChanger as DownloadFileStateChanger,
 )
-from .ensure_git_repo_cloned import (
+from .git.ensure_git_repo_cloned import (
     Branch as Branch,
     Commit as Commit,
     EnsureGitRepoClonedParameters as EnsureGitRepoClonedParameters,
@@ -54,59 +54,59 @@ from .ensure_git_repo_cloned import (
     GitRef as GitRef,
     Tag as Tag,
 )
-from .ensure_launchd_agent import (
+from .launchd.ensure_launchd_agent import (
     EnsureLaunchdAgentParameters as EnsureLaunchdAgentParameters,
     EnsureLaunchdAgentRollbackStateChanger as EnsureLaunchdAgentRollbackStateChanger,
     EnsureLaunchdAgentStateChanger as EnsureLaunchdAgentStateChanger,
     Scope as Scope,
 )
-from .ensure_service import (
+from .service.ensure_service import (
     EnsureServiceParameters as EnsureServiceParameters,
     EnsureServiceRollbackStateChanger as EnsureServiceRollbackStateChanger,
     EnsureServiceStateChanger as EnsureServiceStateChanger,
     LaunchdSpec as LaunchdSpec,
     SystemdSpec as SystemdSpec,
 )
-from .extract_archive import (
+from .archive.extract_archive import (
     ExtractArchiveParameters as ExtractArchiveParameters,
     ExtractArchiveStateChanger as ExtractArchiveStateChanger,
 )
-from .ensure_group_membership import (
+from .posix.ensure_group_membership import (
     EnsureGroupMembershipParameters as EnsureGroupMembershipParameters,
     EnsureGroupMembershipRollbackStateChanger as EnsureGroupMembershipRollbackStateChanger,
     EnsureGroupMembershipStateChanger as EnsureGroupMembershipStateChanger,
 )
-from .ensure_homebrew_installed import (
+from .brew.ensure_homebrew_installed import (
     EnsureHomebrewInstalledParameters as EnsureHomebrewInstalledParameters,
     EnsureHomebrewInstalledStateChanger as EnsureHomebrewInstalledStateChanger,
 )
-from .ensure_default_shell import (
+from .posix.ensure_default_shell import (
     EnsureDefaultShellParameters as EnsureDefaultShellParameters,
     EnsureDefaultShellRollbackStateChanger as EnsureDefaultShellRollbackStateChanger,
     EnsureDefaultShellStateChanger as EnsureDefaultShellStateChanger,
 )
-from .ensure_directory import (
+from .fs.ensure_directory import (
     EnsureDirectoryParameters as EnsureDirectoryParameters,
     EnsureDirectoryRollbackStateChanger as EnsureDirectoryRollbackStateChanger,
     EnsureDirectoryStateChanger as EnsureDirectoryStateChanger,
 )
-from .ensure_systemd_unit import (
+from .systemd.ensure_systemd_unit import (
     EnsureSystemdUnitParameters as EnsureSystemdUnitParameters,
     EnsureSystemdUnitRollbackStateChanger as EnsureSystemdUnitRollbackStateChanger,
     EnsureSystemdUnitStateChanger as EnsureSystemdUnitStateChanger,
     SystemdScope as SystemdScope,
 )
-from .ensure_user import (
+from .posix.ensure_user import (
     EnsureUserParameters as EnsureUserParameters,
     EnsureUserRollbackStateChanger as EnsureUserRollbackStateChanger,
     EnsureUserStateChanger as EnsureUserStateChanger,
 )
-from .ensure_symlink import (
+from .fs.ensure_symlink import (
     EnsureSymlinkParameters as EnsureSymlinkParameters,
     EnsureSymlinkRollbackStateChanger as EnsureSymlinkRollbackStateChanger,
     EnsureSymlinkStateChanger as EnsureSymlinkStateChanger,
 )
-from .ensure_line_in_file import (
+from .fs.ensure_line_in_file import (
     AfterRegex as AfterRegex,
     AtEnd as AtEnd,
     AtStart as AtStart,
@@ -116,17 +116,17 @@ from .ensure_line_in_file import (
     EnsureLineInFileStateChanger as EnsureLineInFileStateChanger,
     Placement as Placement,
 )
-from .fetch_url_to_string import (
+from .net.fetch_url_to_string import (
     FetchUrlToStringParameters as FetchUrlToStringParameters,
     FetchUrlToStringRollbackStateChanger as FetchUrlToStringRollbackStateChanger,
     FetchUrlToStringStateChanger as FetchUrlToStringStateChanger,
 )
-from .new_text_file import (
+from .fs.new_text_file import (
     NewTextFileParameters as NewTextFileParameters,
     NewTextFileRollbackStateChanger as NewTextFileRollbackStateChanger,
     NewTextFileStateChanger as NewTextFileStateChanger,
 )
-from .replace_in_file import (
+from .fs.replace_in_file import (
     LiteralMatch as LiteralMatch,
     Match as Match,
     RegexMatch as RegexMatch,
@@ -134,12 +134,12 @@ from .replace_in_file import (
     ReplaceInFileRollbackStateChanger as ReplaceInFileRollbackStateChanger,
     ReplaceInFileStateChanger as ReplaceInFileStateChanger,
 )
-from .set_file_mode import (
+from .fs.set_file_mode import (
     SetFileModeParameters as SetFileModeParameters,
     SetFileModeRollbackStateChanger as SetFileModeRollbackStateChanger,
     SetFileModeStateChanger as SetFileModeStateChanger,
 )
-from .run_command import (
+from .process.run_command import (
     RunCommandParameters as RunCommandParameters,
     RunCommandStateChanger as RunCommandStateChanger,
 )

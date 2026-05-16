@@ -15,11 +15,11 @@ from statectl._state_changer import (
     StateAssessment,
     StateChanger,
 )
-from statectl._statechangers.ensure_launchd_agent import (
+from statectl._statechangers.launchd.ensure_launchd_agent import (
     EnsureLaunchdAgentParameters,
     EnsureLaunchdAgentStateChanger,
 )
-from statectl._statechangers.ensure_systemd_unit import (
+from statectl._statechangers.systemd.ensure_systemd_unit import (
     EnsureSystemdUnitParameters,
     EnsureSystemdUnitStateChanger,
 )
