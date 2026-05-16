@@ -12,66 +12,66 @@ from statectl._interfaces.fs import FileSystem
 from statectl._interfaces.hashing import Hashing
 from statectl._interfaces.http import HttpClient
 from statectl._interfaces.process import ProcessRunner
-from statectl._statechangers.apt_update import (
+from statectl._statechangers.apt.apt_update import (
     AptUpdateParameters,
     AptUpdateStateChanger,
 )
-from statectl._statechangers.brew_cask import (
+from statectl._statechangers.brew.brew_cask import (
     BrewCaskParameters,
     BrewCaskStateChanger,
 )
-from statectl._statechangers.extract_archive import (
+from statectl._statechangers.archive.extract_archive import (
     ExtractArchiveParameters,
     ExtractArchiveStateChanger,
 )
-from statectl._statechangers.copy_file import (
+from statectl._statechangers.fs.copy_file import (
     CopyFileParameters,
     CopyFileStateChanger,
 )
-from statectl._statechangers.ensure_homebrew_installed import (
+from statectl._statechangers.brew.ensure_homebrew_installed import (
     EnsureHomebrewInstalledParameters,
     EnsureHomebrewInstalledStateChanger,
 )
-from statectl._statechangers.delete_path import (
+from statectl._statechangers.fs.delete_path import (
     DeletePathParameters,
     DeletePathStateChanger,
     PathKind,
 )
-from statectl._statechangers.download_file import (
+from statectl._statechangers.net.download_file import (
     DownloadFileParameters,
     DownloadFileStateChanger,
 )
-from statectl._statechangers.ensure_directory import (
+from statectl._statechangers.fs.ensure_directory import (
     EnsureDirectoryParameters,
     EnsureDirectoryStateChanger,
 )
-from statectl._statechangers.ensure_symlink import (
+from statectl._statechangers.fs.ensure_symlink import (
     EnsureSymlinkParameters,
     EnsureSymlinkStateChanger,
 )
-from statectl._statechangers.ensure_line_in_file import (
+from statectl._statechangers.fs.ensure_line_in_file import (
     EnsureLineInFileParameters,
     EnsureLineInFileStateChanger,
     Placement,
 )
-from statectl._statechangers.fetch_url_to_string import (
+from statectl._statechangers.net.fetch_url_to_string import (
     FetchUrlToStringParameters,
     FetchUrlToStringStateChanger,
 )
-from statectl._statechangers.new_text_file import (
+from statectl._statechangers.fs.new_text_file import (
     NewTextFileParameters,
     NewTextFileStateChanger,
 )
-from statectl._statechangers.replace_in_file import (
+from statectl._statechangers.fs.replace_in_file import (
     Match,
     ReplaceInFileParameters,
     ReplaceInFileStateChanger,
 )
-from statectl._statechangers.run_command import (
+from statectl._statechangers.process.run_command import (
     RunCommandParameters,
     RunCommandStateChanger,
 )
-from statectl._statechangers.set_file_mode import (
+from statectl._statechangers.fs.set_file_mode import (
     SetFileModeParameters,
     SetFileModeStateChanger,
 )
