@@ -26,6 +26,8 @@ from statectl._state_changer import (
 
 
 _OUTPUT_CAP = 4096
+# Allow-list anchor regex for user/group names. The optional trailing `$` is
+# intentional — it matches Samba-style machine accounts (e.g. `HOST$`).
 _NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9._\-]*\$?$")
 
 
@@ -51,6 +53,9 @@ def _probe(pr: ProcessRunner, argv: tuple[str, ...]) -> ProcessResult | _ProbeEr
     try:
         return pr.run(argv)
     except ProcessNotFound as e:
+        # Belt-and-braces: callers should have already verified tools via
+        # `which(...)`, so this branch is normally unreachable. If it does
+        # fire we surface it as INVALID with a diagnostic message.
         return _ProbeError(f"probe failed (not found): {e}")
     except ProcessTimeout as e:
         return _ProbeError(f"probe timed out: {e}")
@@ -112,7 +117,36 @@ def _required_rollback_tool(platform: Platform) -> str:
     return "dseditgroup" if platform == "darwin" else "gpasswd"
 
 
+def _validate_names(user: str, group: str) -> list[str]:
+    issues: list[str] = []
+    if not _NAME_RE.match(user):
+        issues.append(f"invalid user name: {user!r}")
+    if not _NAME_RE.match(group):
+        issues.append(f"invalid group name: {group!r}")
+    return issues
+
+
+def _resolve_user_groups(
+    pr: ProcessRunner, user: str
+) -> _UserGroups | list[str]:
+    """Look up `user`'s groups via `id`. Returns issues (INVALID material) on
+    failure, or the resolved `_UserGroups` otherwise. Assumes `id` is on PATH."""
+    probed = _probe_user_groups(pr, user)
+    if isinstance(probed, _ProbeError):
+        return [probed.message]
+    if not probed.exists:
+        return [f"user not found: {user}"]
+    return probed
+
+
 class EnsureGroupMembershipStateChanger(RollbackableStateChanger):
+    """Ensure `user` is a member of `group`.
+
+    Linux note: `usermod -aG <group> <user>` only takes effect for the user's
+    *new* sessions; already-running logins keep their old supplementary groups
+    until re-login.
+    """
+
     def __init__(
         self,
         params: EnsureGroupMembershipParameters,
@@ -133,28 +167,12 @@ class EnsureGroupMembershipStateChanger(RollbackableStateChanger):
             f"ensure-group-membership:{self._params.user}:{self._params.group}"
         )
 
-    def _assess_input_issues(self) -> list[str]:
-        issues: list[str] = []
-        if not _NAME_RE.match(self._params.user):
-            issues.append(f"invalid user name: {self._params.user!r}")
-        if not _NAME_RE.match(self._params.group):
-            issues.append(f"invalid group name: {self._params.group!r}")
-        return issues
-
     def _invalid(self, issues: list[str]) -> StateAssessment:
         return StateAssessment(
             state=ExistingState.INVALID,
             description="cannot ensure group membership",
             issues=issues,
         )
-
-    def _assess_user_groups(self) -> _UserGroups | StateAssessment:
-        probed = _probe_user_groups(self._pr, self._params.user)
-        if isinstance(probed, _ProbeError):
-            return self._invalid([probed.message])
-        if not probed.exists:
-            return self._invalid([f"user not found: {self._params.user}"])
-        return probed
 
     def _assess_group_for_add(self, platform: Platform) -> StateAssessment | None:
         params = self._params
@@ -174,7 +192,7 @@ class EnsureGroupMembershipStateChanger(RollbackableStateChanger):
         params = self._params
         platform = self._env.platform()
 
-        issues = self._assess_input_issues()
+        issues = _validate_names(params.user, params.group)
         if issues:
             return self._invalid(issues)
 
@@ -184,9 +202,9 @@ class EnsureGroupMembershipStateChanger(RollbackableStateChanger):
         if issues:
             return self._invalid(issues)
 
-        user_groups = self._assess_user_groups()
-        if isinstance(user_groups, StateAssessment):
-            return user_groups
+        user_groups = _resolve_user_groups(self._pr, params.user)
+        if isinstance(user_groups, list):
+            return self._invalid(user_groups)
 
         if params.group in user_groups.groups:
             return StateAssessment(
@@ -253,6 +271,9 @@ class EnsureGroupMembershipStateChanger(RollbackableStateChanger):
 
     @override
     def transition(self) -> Result:
+        # Assumes `assess_state()` returned READY: input names are validated,
+        # required tools are on PATH, and the user exists. Callers that invoke
+        # `transition()` directly (bypassing the engine) must uphold this.
         params = self._params
         platform = self._env.platform()
 
@@ -323,43 +344,28 @@ class EnsureGroupMembershipRollbackStateChanger(StateChanger):
             f"{self._params.user}:{self._params.group}"
         )
 
+    def _invalid(self, issues: list[str]) -> StateAssessment:
+        return StateAssessment(
+            state=ExistingState.INVALID,
+            description="cannot roll back group membership",
+            issues=issues,
+        )
+
     @override
     def assess_state(self) -> StateAssessment:
         params = self._params
         platform = self._env.platform()
 
-        issues: list[str] = []
-        if not _NAME_RE.match(params.user):
-            issues.append(f"invalid user name: {params.user!r}")
-        if not _NAME_RE.match(params.group):
-            issues.append(f"invalid group name: {params.group!r}")
+        issues = _validate_names(params.user, params.group)
         if issues:
-            return StateAssessment(
-                state=ExistingState.INVALID,
-                description="cannot roll back group membership",
-                issues=issues,
-            )
+            return self._invalid(issues)
 
         if self._pr.which("id") is None:
-            return StateAssessment(
-                state=ExistingState.INVALID,
-                description="cannot roll back group membership",
-                issues=["id not on PATH"],
-            )
+            return self._invalid(["id not on PATH"])
 
-        user_groups = _probe_user_groups(self._pr, params.user)
-        if isinstance(user_groups, _ProbeError):
-            return StateAssessment(
-                state=ExistingState.INVALID,
-                description="cannot roll back group membership",
-                issues=[user_groups.message],
-            )
-        if not user_groups.exists:
-            return StateAssessment(
-                state=ExistingState.INVALID,
-                description="cannot roll back group membership",
-                issues=[f"user not found: {params.user}"],
-            )
+        user_groups = _resolve_user_groups(self._pr, params.user)
+        if isinstance(user_groups, list):
+            return self._invalid(user_groups)
 
         if params.group not in user_groups.groups:
             return StateAssessment(
@@ -371,11 +377,7 @@ class EnsureGroupMembershipRollbackStateChanger(StateChanger):
 
         required = _required_rollback_tool(platform)
         if self._pr.which(required) is None:
-            return StateAssessment(
-                state=ExistingState.INVALID,
-                description="cannot roll back group membership",
-                issues=[f"{required} not on PATH"],
-            )
+            return self._invalid([f"{required} not on PATH"])
 
         return StateAssessment(
             state=ExistingState.READY,
