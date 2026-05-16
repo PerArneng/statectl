@@ -80,14 +80,11 @@ class ExtractArchiveStateChanger(StateChanger):
 
     def _param_issues(self) -> list[str]:
         params = self._params
-        issues: list[str] = []
         if params.strip_components < 0:
-            issues.append(
+            return [
                 f"strip_components must be >= 0, got {params.strip_components}"
-            )
-        if not isinstance(params.format, ArchiveFormat):
-            issues.append(f"format is not a valid ArchiveFormat: {params.format!r}")
-        return issues
+            ]
+        return []
 
     def _archive_issues(self) -> list[str]:
         archive_path = self._params.archive_path
@@ -121,12 +118,6 @@ class ExtractArchiveStateChanger(StateChanger):
     @override
     def transition(self) -> Result:
         params = self._params
-        if not self._fs.exists(params.archive_path):
-            return Result.failure(
-                "ARCHIVE_VANISHED",
-                f"archive vanished between assess and extract: {params.archive_path}",
-            )
-
         if params.create_dest and not self._fs.exists(params.dest_dir):
             try:
                 self._fs.create_folder(

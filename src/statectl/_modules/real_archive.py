@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import shutil
 import tarfile
 import zipfile
 from contextlib import contextmanager
@@ -14,6 +16,7 @@ from statectl._interfaces.archive import (
     ArchiveNotFound,
     ArchiveUnsafeEntry,
     ArchiveUnsupportedFormat,
+    strip_path_components,
 )
 
 
@@ -127,7 +130,7 @@ class RealArchive(Archive):
             with opener(src) as tf:
                 members: list[tarfile.TarInfo] = []
                 for member in tf.getmembers():
-                    stripped = _strip_path(member.name, strip_components)
+                    stripped = strip_path_components(member.name, strip_components)
                     if stripped is None:
                         continue
                     if not _is_safe_member(stripped, resolved_dest):
@@ -135,8 +138,10 @@ class RealArchive(Archive):
                             f"unsafe archive entry: {member.name}", path=src
                         )
                     member.name = stripped
-                    if member.islnk():
-                        link_stripped = _strip_path(member.linkname, strip_components)
+                    if member.islnk() or member.issym():
+                        link_stripped = strip_path_components(
+                            member.linkname, strip_components
+                        )
                         if link_stripped is None:
                             continue
                         member.linkname = link_stripped
@@ -153,35 +158,24 @@ class RealArchive(Archive):
             dest.mkdir(parents=True, exist_ok=True)
             resolved_dest = dest.resolve()
             with zipfile.ZipFile(src) as zf:
-                if strip_components == 0:
-                    for name in zf.namelist():
-                        if not _is_safe_member(name, resolved_dest):
-                            raise ArchiveUnsafeEntry(
-                                f"unsafe archive entry: {name}", path=src
-                            )
-                    zf.extractall(dest)
-                    return
                 for info in zf.infolist():
-                    stripped = _strip_path(info.filename, strip_components)
+                    stripped = strip_path_components(info.filename, strip_components)
                     if stripped is None:
                         continue
                     if not _is_safe_member(stripped, resolved_dest):
                         raise ArchiveUnsafeEntry(
                             f"unsafe archive entry: {info.filename}", path=src
                         )
-                    target = dest / stripped
-                    if info.is_dir():
-                        target.mkdir(parents=True, exist_ok=True)
-                        continue
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    with zf.open(info) as source, open(target, "wb") as out:
-                        out.write(source.read())
+                    _write_zip_member(zf, info, dest / stripped)
 
 
-def _strip_path(name: str, strip_components: int) -> str | None:
-    if strip_components <= 0:
-        return name
-    parts = [p for p in name.replace("\\", "/").split("/") if p not in ("", ".")]
-    if len(parts) <= strip_components:
-        return None
-    return "/".join(parts[strip_components:])
+def _write_zip_member(zf: zipfile.ZipFile, info: zipfile.ZipInfo, target: Path) -> None:
+    if info.is_dir():
+        target.mkdir(parents=True, exist_ok=True)
+        return
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with zf.open(info) as source, open(target, "wb") as out:
+        shutil.copyfileobj(source, out)
+    mode = (info.external_attr >> 16) & 0o7777
+    if mode:
+        os.chmod(target, mode)

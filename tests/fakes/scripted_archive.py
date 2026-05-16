@@ -8,6 +8,7 @@ from statectl._interfaces.archive import (
     Archive,
     ArchiveFormat,
     ArchiveNotFound,
+    strip_path_components,
 )
 from statectl._interfaces.fs import FileSystem
 
@@ -73,19 +74,10 @@ class ScriptedArchive(Archive):
             return
         self.file_system.create_folder(dest, parents=True, exist_ok=True)
         for name, content in registered.entries:
-            stripped = _strip_path(name, strip_components)
+            stripped = strip_path_components(name, strip_components)
             if stripped is None:
                 continue
             target = dest / stripped
             if target.parent != dest:
                 self.file_system.create_folder(target.parent, parents=True, exist_ok=True)
             self.file_system.write_text_file(target, content)
-
-
-def _strip_path(name: str, strip_components: int) -> str | None:
-    if strip_components <= 0:
-        return name
-    parts = [p for p in name.replace("\\", "/").split("/") if p not in ("", ".")]
-    if len(parts) <= strip_components:
-        return None
-    return "/".join(parts[strip_components:])

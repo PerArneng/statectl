@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import override
 
 import pytest
 
@@ -93,8 +94,13 @@ def test_archive_vanished_before_transition_returns_failure() -> None:
 
 def test_unexpected_exception_propagates() -> None:
     class _Boom(ScriptedArchive):
-        def extract(  # type: ignore[override]
-            self, src: Path, dest: Path, format: ArchiveFormat, strip_components: int = 0
+        @override
+        def extract(
+            self,
+            src: Path,
+            dest: Path,
+            format: ArchiveFormat,
+            strip_components: int = 0,
         ) -> None:
             raise RuntimeError("unexpected")
 
