@@ -3,6 +3,14 @@ from .apt_package import (
     AptPackageRollbackStateChanger as AptPackageRollbackStateChanger,
     AptPackageStateChanger as AptPackageStateChanger,
 )
+from .apt_repository import (
+    AptRepositoryParameters as AptRepositoryParameters,
+    AptRepositoryRollbackStateChanger as AptRepositoryRollbackStateChanger,
+    AptRepositoryStateChanger as AptRepositoryStateChanger,
+    InlineKey as InlineKey,
+    KeySource as KeySource,
+    UrlKey as UrlKey,
+)
 from .brew_cask import (
     BrewCaskParameters as BrewCaskParameters,
     BrewCaskRollbackStateChanger as BrewCaskRollbackStateChanger,
@@ -115,6 +123,9 @@ __all__ = [
     "AptPackageParameters",
     "AptPackageRollbackStateChanger",
     "AptPackageStateChanger",
+    "AptRepositoryParameters",
+    "AptRepositoryRollbackStateChanger",
+    "AptRepositoryStateChanger",
     "AtEnd",
     "AtStart",
     "BeforeRegex",
@@ -163,6 +174,8 @@ __all__ = [
     "FetchUrlToStringRollbackStateChanger",
     "FetchUrlToStringStateChanger",
     "GitRef",
+    "InlineKey",
+    "KeySource",
     "NewTextFileParameters",
     "NewTextFileRollbackStateChanger",
     "NewTextFileStateChanger",
@@ -182,4 +195,5 @@ __all__ = [
     "SetFileModeStateChanger",
     "StateChangers",
     "Tag",
+    "UrlKey",
 ]
