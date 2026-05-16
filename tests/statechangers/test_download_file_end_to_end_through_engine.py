@@ -10,6 +10,7 @@ from statectl._statechangers import (
     DownloadFileStateChanger,
 )
 from tests.fakes.in_memory_file_system import InMemoryFileSystem
+from tests.fakes.scripted_archive import ScriptedArchive
 from tests.fakes.scripted_clock import ScriptedClock
 from tests.fakes.scripted_env import ScriptedEnv
 from tests.fakes.scripted_hashing import ScriptedHashing, sha256_of
@@ -28,6 +29,7 @@ def _engine(
         process_runner=ScriptedProcessRunner(),
         http_client=http,
         env=ScriptedEnv.linux(),
+        archive=ScriptedArchive(),
         hashing=hashing,
         clock=ScriptedClock(),
         variable_registry=InMemoryVariableRegistry(),

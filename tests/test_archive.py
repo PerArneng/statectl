@@ -75,6 +75,27 @@ def test_failing_archive_injects_one_shot_failure() -> None:
     assert len(inner.calls) == 1
 
 
+def test_scripted_extract_with_strip_components_drops_leading_path() -> None:
+    fs = InMemoryFileSystem()
+    fs.add_dir(Path("/tmp"))
+    archive = ScriptedArchive(file_system=fs)
+    src = Path("/pkg.tar.gz")
+    dest = Path("/tmp/out")
+    archive.register_archive(
+        src,
+        ArchiveFormat.TAR_GZ,
+        entries={"v1.0/bin/foo": "x", "v1.0/README": "r", "skip-me": "no"},
+    )
+
+    archive.extract(src, dest, ArchiveFormat.TAR_GZ, strip_components=1)
+
+    assert fs.read_text_file(dest / "bin" / "foo") == "x"
+    assert fs.read_text_file(dest / "README") == "r"
+    # "skip-me" has only 1 path component — dropped entirely.
+    assert not fs.exists(dest / "skip-me")
+    assert archive.calls[0].strip_components == 1
+
+
 def test_failing_archive_passes_through_detect_format() -> None:
     inner = ScriptedArchive()
     src = Path("/pkg.zip")

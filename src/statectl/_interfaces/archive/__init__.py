@@ -1,4 +1,8 @@
-from .archive import Archive as Archive, ArchiveFormat as ArchiveFormat
+from .archive import (
+    Archive as Archive,
+    ArchiveFormat as ArchiveFormat,
+    strip_path_components as strip_path_components,
+)
 from .archive_errors import (
     ArchiveCorrupt as ArchiveCorrupt,
     ArchiveError as ArchiveError,
@@ -17,4 +21,5 @@ __all__ = [
     "ArchiveNotFound",
     "ArchiveUnsafeEntry",
     "ArchiveUnsupportedFormat",
+    "strip_path_components",
 ]

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import shutil
 import tarfile
 import zipfile
 from contextlib import contextmanager
@@ -14,6 +16,7 @@ from statectl._interfaces.archive import (
     ArchiveNotFound,
     ArchiveUnsafeEntry,
     ArchiveUnsupportedFormat,
+    strip_path_components,
 )
 
 
@@ -90,44 +93,89 @@ class RealArchive(Archive):
         return None
 
     @override
-    def extract(self, src: Path, dest: Path, format: ArchiveFormat) -> None:
+    def extract(
+        self,
+        src: Path,
+        dest: Path,
+        format: ArchiveFormat,
+        strip_components: int = 0,
+    ) -> None:
+        if strip_components < 0:
+            raise ArchiveUnsupportedFormat(
+                f"strip_components must be >= 0, got {strip_components}",
+                path=src,
+            )
         if not src.exists():
             raise ArchiveNotFound("archive not found", path=src)
         if format is ArchiveFormat.ZIP:
-            self._extract_zip(src, dest)
+            self._extract_zip(src, dest, strip_components)
             return
         opener = _TAR_OPENERS.get(format)
         if opener is None:
             raise ArchiveUnsupportedFormat(
                 f"unsupported archive format: {format.value}", path=src
             )
-        self._extract_tar(src, dest, opener)
+        self._extract_tar(src, dest, opener, strip_components)
 
     def _extract_tar(
         self,
         src: Path,
         dest: Path,
         opener: "_TarOpener",
+        strip_components: int,
     ) -> None:
         with _translate(src):
             dest.mkdir(parents=True, exist_ok=True)
             resolved_dest = dest.resolve()
             with opener(src) as tf:
+                members: list[tarfile.TarInfo] = []
                 for member in tf.getmembers():
-                    if not _is_safe_member(member.name, resolved_dest):
+                    stripped = strip_path_components(member.name, strip_components)
+                    if stripped is None:
+                        continue
+                    if not _is_safe_member(stripped, resolved_dest):
                         raise ArchiveUnsafeEntry(
                             f"unsafe archive entry: {member.name}", path=src
                         )
-                tf.extractall(dest, filter="data")
+                    member.name = stripped
+                    if member.islnk() or member.issym():
+                        link_stripped = strip_path_components(
+                            member.linkname, strip_components
+                        )
+                        if link_stripped is None:
+                            continue
+                        member.linkname = link_stripped
+                    members.append(member)
+                tf.extractall(dest, members=members, filter="data")
 
-    def _extract_zip(self, src: Path, dest: Path) -> None:
+    def _extract_zip(
+        self,
+        src: Path,
+        dest: Path,
+        strip_components: int,
+    ) -> None:
         with _translate(src):
             dest.mkdir(parents=True, exist_ok=True)
             resolved_dest = dest.resolve()
             with zipfile.ZipFile(src) as zf:
-                for name in zf.namelist():
-                    if not _is_safe_member(name, resolved_dest):
+                for info in zf.infolist():
+                    stripped = strip_path_components(info.filename, strip_components)
+                    if stripped is None:
+                        continue
+                    if not _is_safe_member(stripped, resolved_dest):
                         raise ArchiveUnsafeEntry(
-                            f"unsafe archive entry: {name}", path=src
+                            f"unsafe archive entry: {info.filename}", path=src
                         )
-                zf.extractall(dest)
+                    _write_zip_member(zf, info, dest / stripped)
+
+
+def _write_zip_member(zf: zipfile.ZipFile, info: zipfile.ZipInfo, target: Path) -> None:
+    if info.is_dir():
+        target.mkdir(parents=True, exist_ok=True)
+        return
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with zf.open(info) as source, open(target, "wb") as out:
+        shutil.copyfileobj(source, out)
+    mode = (info.external_attr >> 16) & 0o7777
+    if mode:
+        os.chmod(target, mode)

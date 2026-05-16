@@ -5,6 +5,18 @@ from enum import Enum
 from pathlib import Path
 
 
+def strip_path_components(name: str, strip_components: int) -> str | None:
+    """Return `name` with `strip_components` leading path components removed,
+    or None if `name` has too few components to strip. Used by both the real
+    Archive impl and the in-memory test fake so they share semantics."""
+    if strip_components <= 0:
+        return name
+    parts = [p for p in name.replace("\\", "/").split("/") if p not in ("", ".")]
+    if len(parts) <= strip_components:
+        return None
+    return "/".join(parts[strip_components:])
+
+
 class ArchiveFormat(Enum):
     TAR = "tar"
     TAR_GZ = "tar.gz"
@@ -32,4 +44,10 @@ class Archive(ABC):
     def detect_format(self, path: Path) -> ArchiveFormat | None: ...
 
     @abstractmethod
-    def extract(self, src: Path, dest: Path, format: ArchiveFormat) -> None: ...
+    def extract(
+        self,
+        src: Path,
+        dest: Path,
+        format: ArchiveFormat,
+        strip_components: int = 0,
+    ) -> None: ...
