@@ -71,6 +71,11 @@ from .extract_archive import (
     ExtractArchiveParameters as ExtractArchiveParameters,
     ExtractArchiveStateChanger as ExtractArchiveStateChanger,
 )
+from .ensure_group_membership import (
+    EnsureGroupMembershipParameters as EnsureGroupMembershipParameters,
+    EnsureGroupMembershipRollbackStateChanger as EnsureGroupMembershipRollbackStateChanger,
+    EnsureGroupMembershipStateChanger as EnsureGroupMembershipStateChanger,
+)
 from .ensure_homebrew_installed import (
     EnsureHomebrewInstalledParameters as EnsureHomebrewInstalledParameters,
     EnsureHomebrewInstalledStateChanger as EnsureHomebrewInstalledStateChanger,
@@ -181,6 +186,9 @@ __all__ = [
     "EnsureGitRepoClonedParameters",
     "EnsureGitRepoClonedRollbackStateChanger",
     "EnsureGitRepoClonedStateChanger",
+    "EnsureGroupMembershipParameters",
+    "EnsureGroupMembershipRollbackStateChanger",
+    "EnsureGroupMembershipStateChanger",
     "EnsureHomebrewInstalledParameters",
     "EnsureHomebrewInstalledStateChanger",
     "EnsureLaunchdAgentParameters",
