@@ -12,6 +12,10 @@ from statectl._interfaces.fs import FileSystem
 from statectl._interfaces.hashing import Hashing
 from statectl._interfaces.http import HttpClient
 from statectl._interfaces.process import ProcessRunner
+from statectl._statechangers.apt_update import (
+    AptUpdateParameters,
+    AptUpdateStateChanger,
+)
 from statectl._statechangers.brew_cask import (
     BrewCaskParameters,
     BrewCaskStateChanger,
@@ -91,6 +95,25 @@ class StateChangers:
         self._hashing: Hashing = hashing
         self._clock: Clock = clock
         self._archive: Archive = archive
+
+    def apt_update(
+        self,
+        *,
+        max_age: timedelta = timedelta(hours=24),
+        lists_dir: str | Path = Path("/var/lib/apt/lists"),
+        allow_releaseinfo_change: bool = False,
+    ) -> AptUpdateStateChanger:
+        return AptUpdateStateChanger(
+            AptUpdateParameters(
+                max_age=max_age,
+                lists_dir=Path(lists_dir),
+                allow_releaseinfo_change=allow_releaseinfo_change,
+            ),
+            process_runner=self._pr,
+            file_system=self._fs,
+            env=self._env,
+            clock=self._clock,
+        )
 
     def brew_cask(
         self,
