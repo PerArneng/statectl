@@ -37,6 +37,12 @@ from .ensure_git_repo_cloned import (
     GitRef as GitRef,
     Tag as Tag,
 )
+from .ensure_launchd_agent import (
+    EnsureLaunchdAgentParameters as EnsureLaunchdAgentParameters,
+    EnsureLaunchdAgentRollbackStateChanger as EnsureLaunchdAgentRollbackStateChanger,
+    EnsureLaunchdAgentStateChanger as EnsureLaunchdAgentStateChanger,
+    Scope as Scope,
+)
 from .extract_archive import (
     ExtractArchiveParameters as ExtractArchiveParameters,
     ExtractArchiveStateChanger as ExtractArchiveStateChanger,
@@ -126,6 +132,9 @@ __all__ = [
     "EnsureGitRepoClonedStateChanger",
     "EnsureHomebrewInstalledParameters",
     "EnsureHomebrewInstalledStateChanger",
+    "EnsureLaunchdAgentParameters",
+    "EnsureLaunchdAgentRollbackStateChanger",
+    "EnsureLaunchdAgentStateChanger",
     "EnsureLineInFileParameters",
     "EnsureLineInFileRollbackStateChanger",
     "EnsureLineInFileStateChanger",
@@ -150,6 +159,7 @@ __all__ = [
     "ReplaceInFileRollbackStateChanger",
     "ReplaceInFileStateChanger",
     "RunCommandParameters",
+    "Scope",
     "RunCommandStateChanger",
     "SetFileModeParameters",
     "SetFileModeRollbackStateChanger",
