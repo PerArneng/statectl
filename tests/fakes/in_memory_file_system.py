@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 from statectl._interfaces.fs import (
@@ -31,6 +32,9 @@ class _Node:
     link_mode: int = _DEFAULT_LINK_MODE
     is_symlink: bool = False
     symlink_target: Path | None = None
+    mtime: datetime = field(
+        default_factory=lambda: datetime(2026, 1, 1, tzinfo=timezone.utc)
+    )
 
 
 @dataclass
@@ -137,6 +141,15 @@ class InMemoryFileSystem(FileSystem):
         if node.is_symlink and not follow_symlinks:
             return node.link_mode & 0o7777
         return node.mode & 0o7777
+
+    def mtime(self, path: Path) -> datetime | None:
+        node = self._nodes.get(path)
+        if node is None:
+            return None
+        return node.mtime
+
+    def set_mtime(self, path: Path, mtime: datetime) -> None:
+        self._nodes[path].mtime = mtime
 
     def supports_lchmod(self) -> bool:
         return self.lchmod_supported

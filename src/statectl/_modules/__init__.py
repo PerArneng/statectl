@@ -3,6 +3,7 @@ from .in_memory_variable_registry import (
     InMemoryVariableRegistry as InMemoryVariableRegistry,
 )
 from .real_archive import RealArchive as RealArchive
+from .real_clock import RealClock as RealClock
 from .real_env import RealEnv as RealEnv
 from .real_file_system import RealFileSystem as RealFileSystem
 from .real_hashing import RealHashing as RealHashing
@@ -13,6 +14,7 @@ __all__ = [
     "DefaultLogger",
     "InMemoryVariableRegistry",
     "RealArchive",
+    "RealClock",
     "RealEnv",
     "RealFileSystem",
     "RealHashing",

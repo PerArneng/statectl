@@ -4,6 +4,7 @@ import os
 import shutil
 import tempfile
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator, override
 
@@ -79,6 +80,14 @@ class RealFileSystem(FileSystem):
             return st.st_mode & 0o7777
         except OSError:
             return None
+
+    @override
+    def mtime(self, path: Path) -> datetime | None:
+        try:
+            st = os.stat(path)
+        except OSError:
+            return None
+        return datetime.fromtimestamp(st.st_mtime, tz=timezone.utc)
 
     @override
     def supports_lchmod(self) -> bool:

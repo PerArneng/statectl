@@ -9,6 +9,7 @@ from statectl._state_changer import (
     StateChanger,
 )
 from tests._changer_fixtures import ProgrammableChanger, publish_value
+from tests.fakes.scripted_clock import ScriptedClock
 from tests.fakes.scripted_env import ScriptedEnv
 from tests.fakes.scripted_http_client import ScriptedHttpClient
 from tests.fakes.in_memory_file_system import InMemoryFileSystem
@@ -23,6 +24,7 @@ def _engine(registry: VariableRegistry | None = None) -> StateCtl:
         http_client=ScriptedHttpClient(),
         env=ScriptedEnv.linux(),
         hashing=RealHashing(),
+        clock=ScriptedClock(),
         variable_registry=registry or InMemoryVariableRegistry(),
     )
 

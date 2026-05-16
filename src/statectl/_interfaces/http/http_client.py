@@ -33,6 +33,14 @@ class HttpClient(ABC):
     ) -> HttpResponse: ...
 
     @abstractmethod
+    def get_bytes(
+        self,
+        url: str,
+        headers: Mapping[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> bytes: ...
+
+    @abstractmethod
     def download_to_file(
         self,
         url: str,

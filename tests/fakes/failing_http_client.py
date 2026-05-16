@@ -40,6 +40,16 @@ class FailingHttpClient(HttpClient):
         return self._inner.get(url, headers=headers, timeout=timeout)
 
     @override
+    def get_bytes(
+        self,
+        url: str,
+        headers: Mapping[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> bytes:
+        self._maybe_fail("get_bytes")
+        return self._inner.get_bytes(url, headers=headers, timeout=timeout)
+
+    @override
     def download_to_file(
         self,
         url: str,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 
@@ -48,6 +49,9 @@ class FileSystem(ABC):
 
     @abstractmethod
     def stat_mode(self, path: Path, follow_symlinks: bool = True) -> int | None: ...
+
+    @abstractmethod
+    def mtime(self, path: Path) -> datetime | None: ...
 
     @abstractmethod
     def supports_lchmod(self) -> bool: ...

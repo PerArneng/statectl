@@ -6,6 +6,7 @@ from statectl._interfaces.process import ProcessResult
 from statectl._modules import DefaultLogger, InMemoryVariableRegistry, RealHashing
 from statectl._statechangers import BrewCaskParameters, BrewCaskStateChanger
 from tests.fakes.in_memory_file_system import InMemoryFileSystem
+from tests.fakes.scripted_clock import ScriptedClock
 from tests.fakes.scripted_env import ScriptedEnv
 from tests.fakes.scripted_http_client import ScriptedHttpClient
 from tests.fakes.scripted_process_runner import ScriptedProcessRunner
@@ -19,6 +20,7 @@ def _engine(pr: ScriptedProcessRunner) -> StateCtl:
         http_client=ScriptedHttpClient(),
         env=ScriptedEnv.darwin(),
         hashing=RealHashing(),
+        clock=ScriptedClock(),
         variable_registry=InMemoryVariableRegistry(),
     )
 
@@ -121,6 +123,7 @@ def test_engine_runs_install_when_not_installed() -> None:
         http_client=ScriptedHttpClient(),
         env=ScriptedEnv.darwin(),
         hashing=RealHashing(),
+        clock=ScriptedClock(),
         variable_registry=InMemoryVariableRegistry(),
     )
     engine.add(

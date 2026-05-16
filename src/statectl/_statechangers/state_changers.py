@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import shlex
+from datetime import timedelta
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
+from statectl._interfaces.clock import Clock
 from statectl._interfaces.env import Env
 from statectl._interfaces.fs import FileSystem
 from statectl._interfaces.hashing import Hashing
@@ -43,6 +45,10 @@ from statectl._statechangers.ensure_line_in_file import (
     EnsureLineInFileStateChanger,
     Placement,
 )
+from statectl._statechangers.fetch_url_to_string import (
+    FetchUrlToStringParameters,
+    FetchUrlToStringStateChanger,
+)
 from statectl._statechangers.new_text_file import (
     NewTextFileParameters,
     NewTextFileStateChanger,
@@ -70,12 +76,14 @@ class StateChangers:
         http_client: HttpClient,
         env: Env,
         hashing: Hashing,
+        clock: Clock,
     ) -> None:
         self._fs: FileSystem = file_system
         self._pr: ProcessRunner = process_runner
         self._http: HttpClient = http_client
         self._env: Env = env
         self._hashing: Hashing = hashing
+        self._clock: Clock = clock
 
     def brew_cask(
         self,
@@ -263,6 +271,30 @@ class StateChangers:
                 follow_symlinks=follow_symlinks,
             ),
             file_system=self._fs,
+        )
+
+    def fetch_url_to_string(
+        self,
+        url: str,
+        cache_path: str | Path,
+        *,
+        max_age: timedelta | None = None,
+        headers: Mapping[str, str] | None = None,
+        encoding: str = "utf-8",
+        timeout: float | None = None,
+    ) -> FetchUrlToStringStateChanger:
+        return FetchUrlToStringStateChanger(
+            FetchUrlToStringParameters(
+                url=url,
+                cache_path=Path(cache_path),
+                max_age=max_age,
+                headers=dict(headers) if headers else {},
+                encoding=encoding,
+                timeout=timeout,
+            ),
+            file_system=self._fs,
+            http_client=self._http,
+            clock=self._clock,
         )
 
     def run(

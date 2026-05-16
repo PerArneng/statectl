@@ -61,6 +61,11 @@ from .ensure_line_in_file import (
     EnsureLineInFileStateChanger as EnsureLineInFileStateChanger,
     Placement as Placement,
 )
+from .fetch_url_to_string import (
+    FetchUrlToStringParameters as FetchUrlToStringParameters,
+    FetchUrlToStringRollbackStateChanger as FetchUrlToStringRollbackStateChanger,
+    FetchUrlToStringStateChanger as FetchUrlToStringStateChanger,
+)
 from .new_text_file import (
     NewTextFileParameters as NewTextFileParameters,
     NewTextFileRollbackStateChanger as NewTextFileRollbackStateChanger,
@@ -123,6 +128,9 @@ __all__ = [
     "EnsureSymlinkParameters",
     "EnsureSymlinkRollbackStateChanger",
     "EnsureSymlinkStateChanger",
+    "FetchUrlToStringParameters",
+    "FetchUrlToStringRollbackStateChanger",
+    "FetchUrlToStringStateChanger",
     "GitRef",
     "NewTextFileParameters",
     "NewTextFileRollbackStateChanger",
