@@ -6,13 +6,15 @@ from typing import Mapping, Sequence, override
 from statectl import StateCtl
 from statectl._engine_result import NodeOutcome
 from statectl._interfaces.process import ProcessResult
-from statectl._modules import DefaultLogger, InMemoryVariableRegistry
+from statectl._modules import DefaultLogger, InMemoryVariableRegistry, RealHashing
 from statectl._statechangers import (
     AptRepositoryParameters,
     AptRepositoryStateChanger,
     InlineKey,
 )
 from tests.fakes.in_memory_file_system import InMemoryFileSystem
+from tests.fakes.scripted_archive import ScriptedArchive
+from tests.fakes.scripted_clock import ScriptedClock
 from tests.fakes.scripted_env import ScriptedEnv
 from tests.fakes.scripted_http_client import ScriptedHttpClient
 from tests.fakes.scripted_process_runner import ScriptedProcessRunner
@@ -91,6 +93,9 @@ def _engine(
         process_runner=pr,
         http_client=http,
         env=env,
+        archive=ScriptedArchive(),
+        hashing=RealHashing(),
+        clock=ScriptedClock(),
         variable_registry=InMemoryVariableRegistry(),
     )
 
