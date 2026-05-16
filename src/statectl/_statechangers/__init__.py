@@ -51,6 +51,11 @@ from .ensure_homebrew_installed import (
     EnsureHomebrewInstalledParameters as EnsureHomebrewInstalledParameters,
     EnsureHomebrewInstalledStateChanger as EnsureHomebrewInstalledStateChanger,
 )
+from .ensure_default_shell import (
+    EnsureDefaultShellParameters as EnsureDefaultShellParameters,
+    EnsureDefaultShellRollbackStateChanger as EnsureDefaultShellRollbackStateChanger,
+    EnsureDefaultShellStateChanger as EnsureDefaultShellStateChanger,
+)
 from .ensure_directory import (
     EnsureDirectoryParameters as EnsureDirectoryParameters,
     EnsureDirectoryRollbackStateChanger as EnsureDirectoryRollbackStateChanger,
@@ -124,6 +129,9 @@ __all__ = [
     "DownloadFileParameters",
     "DownloadFileRollbackStateChanger",
     "DownloadFileStateChanger",
+    "EnsureDefaultShellParameters",
+    "EnsureDefaultShellRollbackStateChanger",
+    "EnsureDefaultShellStateChanger",
     "EnsureDirectoryParameters",
     "EnsureDirectoryRollbackStateChanger",
     "EnsureDirectoryStateChanger",
