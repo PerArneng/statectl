@@ -6,7 +6,7 @@ from typing import Mapping, Sequence, override
 from statectl import StateCtl
 from statectl._engine_result import NodeOutcome
 from statectl._interfaces.process import ProcessResult
-from statectl._modules import DefaultLogger, InMemoryVariableRegistry
+from statectl._modules import DefaultLogger, InMemoryVariableRegistry, RealHashing
 from statectl._statechangers import (
     BrewPackageParameters,
     BrewPackageStateChanger,
@@ -100,6 +100,7 @@ def _engine(pr: ScriptedProcessRunner) -> StateCtl:
         process_runner=pr,
         http_client=ScriptedHttpClient(),
         env=ScriptedEnv.darwin(),
+        hashing=RealHashing(),
         variable_registry=InMemoryVariableRegistry(),
     )
 

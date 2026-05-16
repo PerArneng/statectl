@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from statectl._interfaces.process import ProcessResult
-from statectl._modules import DefaultLogger, InMemoryVariableRegistry
+from statectl._modules import DefaultLogger, InMemoryVariableRegistry, RealHashing
 from statectl import StateCtl
 from statectl._statechangers import (
     RunCommandParameters,
@@ -25,6 +25,7 @@ def _engine(
         process_runner=process_runner or ScriptedProcessRunner(),
         http_client=ScriptedHttpClient(),
         env=ScriptedEnv.linux(),
+        hashing=RealHashing(),
         variable_registry=InMemoryVariableRegistry(),
     )
 

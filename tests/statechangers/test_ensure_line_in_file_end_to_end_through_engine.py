@@ -4,7 +4,7 @@ from pathlib import Path
 
 from statectl import StateCtl
 from statectl._engine_result import NodeOutcome
-from statectl._modules import DefaultLogger, InMemoryVariableRegistry
+from statectl._modules import DefaultLogger, InMemoryVariableRegistry, RealHashing
 from statectl._statechangers import (
     AtEnd,
     EnsureLineInFileParameters,
@@ -26,6 +26,7 @@ def _engine(fs: InMemoryFileSystem) -> StateCtl:
         process_runner=ScriptedProcessRunner(),
         http_client=ScriptedHttpClient(),
         env=ScriptedEnv.linux(),
+        hashing=RealHashing(),
         variable_registry=InMemoryVariableRegistry(),
     )
 

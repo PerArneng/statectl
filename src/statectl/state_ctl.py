@@ -22,6 +22,7 @@ from statectl._execution_node import (
 )
 from statectl._interfaces.env import Env
 from statectl._interfaces.fs import FileSystem
+from statectl._interfaces.hashing import Hashing
 from statectl._interfaces.http import HttpClient
 from statectl._interfaces.logger import Logger
 from statectl._interfaces.process import ProcessRunner
@@ -36,6 +37,7 @@ from statectl._modules import (
     InMemoryVariableRegistry,
     RealEnv,
     RealFileSystem,
+    RealHashing,
     RealHttpClient,
     RealProcessRunner,
 )
@@ -75,6 +77,7 @@ class StateCtl:
         process_runner: ProcessRunner,
         http_client: HttpClient,
         env: Env,
+        hashing: Hashing,
         variable_registry: VariableRegistry,
     ) -> None:
         self._logger: Logger = logger
@@ -82,6 +85,7 @@ class StateCtl:
         self._pr: ProcessRunner = process_runner
         self._http: HttpClient = http_client
         self._env: Env = env
+        self._hashing: Hashing = hashing
         self._registry: VariableRegistry = variable_registry
         self._nodes: list[ExecutionNode] = []
         self._node_by_handle_id: dict[int, ExecutionNode] = {}
@@ -93,6 +97,7 @@ class StateCtl:
             process_runner=self._pr,
             http_client=self._http,
             env=self._env,
+            hashing=self._hashing,
         )
 
     def registry(self) -> VariableRegistry:
@@ -479,6 +484,7 @@ class StateCtl:
         process_runner: ProcessRunner | None = None,
         http_client: HttpClient | None = None,
         env: Env | None = None,
+        hashing: Hashing | None = None,
         variable_registry: VariableRegistry | None = None,
     ) -> StateCtl:
         container = _Container()
@@ -490,6 +496,8 @@ class StateCtl:
             container.http_client.override(providers.Object(http_client))
         if env is not None:
             container.env.override(providers.Object(env))
+        if hashing is not None:
+            container.hashing.override(providers.Object(hashing))
         if variable_registry is not None:
             container.variable_registry.override(providers.Object(variable_registry))
         return container.engine()
@@ -501,6 +509,7 @@ class _Container(containers.DeclarativeContainer):
     process_runner = providers.Singleton(RealProcessRunner)
     http_client = providers.Singleton(RealHttpClient)
     env = providers.Singleton(RealEnv)
+    hashing = providers.Singleton(RealHashing)
     variable_registry = providers.Singleton(InMemoryVariableRegistry)
     engine = providers.Singleton(
         StateCtl,
@@ -509,5 +518,6 @@ class _Container(containers.DeclarativeContainer):
         process_runner=process_runner,
         http_client=http_client,
         env=env,
+        hashing=hashing,
         variable_registry=variable_registry,
     )

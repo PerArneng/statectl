@@ -23,6 +23,11 @@ from .delete_path import (
     DeletePathStateChanger as DeletePathStateChanger,
     PathKind as PathKind,
 )
+from .download_file import (
+    DownloadFileParameters as DownloadFileParameters,
+    DownloadFileRollbackStateChanger as DownloadFileRollbackStateChanger,
+    DownloadFileStateChanger as DownloadFileStateChanger,
+)
 from .ensure_git_repo_cloned import (
     Branch as Branch,
     Commit as Commit,
@@ -101,6 +106,9 @@ __all__ = [
     "CopyFileStateChanger",
     "DeletePathParameters",
     "DeletePathStateChanger",
+    "DownloadFileParameters",
+    "DownloadFileRollbackStateChanger",
+    "DownloadFileStateChanger",
     "EnsureDirectoryParameters",
     "EnsureDirectoryRollbackStateChanger",
     "EnsureDirectoryStateChanger",

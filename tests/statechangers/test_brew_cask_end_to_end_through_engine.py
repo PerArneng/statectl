@@ -3,7 +3,7 @@ from __future__ import annotations
 from statectl import StateCtl
 from statectl._engine_result import NodeOutcome
 from statectl._interfaces.process import ProcessResult
-from statectl._modules import DefaultLogger, InMemoryVariableRegistry
+from statectl._modules import DefaultLogger, InMemoryVariableRegistry, RealHashing
 from statectl._statechangers import BrewCaskParameters, BrewCaskStateChanger
 from tests.fakes.in_memory_file_system import InMemoryFileSystem
 from tests.fakes.scripted_env import ScriptedEnv
@@ -18,6 +18,7 @@ def _engine(pr: ScriptedProcessRunner) -> StateCtl:
         process_runner=pr,
         http_client=ScriptedHttpClient(),
         env=ScriptedEnv.darwin(),
+        hashing=RealHashing(),
         variable_registry=InMemoryVariableRegistry(),
     )
 
@@ -119,6 +120,7 @@ def test_engine_runs_install_when_not_installed() -> None:
         process_runner=pr,
         http_client=ScriptedHttpClient(),
         env=ScriptedEnv.darwin(),
+        hashing=RealHashing(),
         variable_registry=InMemoryVariableRegistry(),
     )
     engine.add(

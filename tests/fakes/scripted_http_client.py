@@ -9,6 +9,7 @@ from statectl._interfaces.http import (
     HttpNotFound,
     HttpResponse,
 )
+from tests.fakes.in_memory_file_system import InMemoryFileSystem
 
 
 @dataclass(frozen=True)
@@ -25,11 +26,15 @@ class ScriptedHttpClient(HttpClient):
     """In-memory HttpClient. Register URL -> response (or URL -> raw bytes for
     downloads). Unregistered URLs raise HttpNotFound. Every call is recorded on
     `.calls` for assertions.
+
+    If `file_system` is set, `download_to_file` writes the body into that
+    in-memory FS (utf-8 decoded) rather than touching real disk.
     """
 
     _responses: dict[str, HttpResponse] = field(default_factory=dict)
     _downloads: dict[str, bytes] = field(default_factory=dict)
     calls: list[RecordedHttpCall] = field(default_factory=list)
+    file_system: InMemoryFileSystem | None = None
 
     def register_response(self, url: str, response: HttpResponse) -> None:
         self._responses[url] = response
@@ -64,4 +69,16 @@ class ScriptedHttpClient(HttpClient):
         )
         if url not in self._downloads:
             raise HttpNotFound(f"no scripted download for {url}", url=url)
-        dest.write_bytes(self._downloads[url])
+        body = self._downloads[url]
+        if self.file_system is not None:
+            try:
+                text = body.decode("utf-8")
+            except UnicodeDecodeError as e:
+                raise ValueError(
+                    f"ScriptedHttpClient: registered body for {url} is not valid "
+                    f"utf-8 ({e}); add_binary_file support is not yet wired through "
+                    f"InMemoryFileSystem"
+                ) from e
+            self.file_system.add_file(dest, content=text)
+        else:
+            dest.write_bytes(body)

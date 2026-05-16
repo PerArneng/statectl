@@ -7,7 +7,7 @@ import pytest
 from statectl import NodeOutcome, StateCtl
 from statectl._engine_error import DeferredWithoutDependenciesError
 from statectl._interfaces.registry import VariableRegistry
-from statectl._modules import DefaultLogger, InMemoryVariableRegistry
+from statectl._modules import DefaultLogger, InMemoryVariableRegistry, RealHashing
 from statectl._state_changer import (
     ExistingState,
     Result,
@@ -27,6 +27,7 @@ def _engine() -> StateCtl:
         process_runner=ScriptedProcessRunner(),
         http_client=ScriptedHttpClient(),
         env=ScriptedEnv.linux(),
+        hashing=RealHashing(),
         variable_registry=InMemoryVariableRegistry(),
     )
 
